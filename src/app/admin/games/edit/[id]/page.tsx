@@ -2,7 +2,7 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 import EditGameClient from './edit-game-client'
 
-export default function EditGamePage({ params }: { params: { id: string } }) {
+export default function EditGamePage({ params }: { params: { id: string | string[] } }) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />

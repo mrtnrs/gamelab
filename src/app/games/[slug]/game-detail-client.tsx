@@ -65,7 +65,9 @@ const mockGameData = {
   ]
 };
 
-export default function GameDetailClient({ slug }: { slug: string }) {
+export default function GameDetailClient({ slug }: { slug: string | string[] }) {
+  // Ensure we have a single string slug
+  const gameSlug = Array.isArray(slug) ? slug[0] : slug;
   const [game, setGame] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -92,7 +94,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
     
     // Cleanup
     return () => window.removeEventListener('resize', checkIfDesktop);
-  }, [slug]);
+  }, [gameSlug]);
   
   if (loading) {
     return (
