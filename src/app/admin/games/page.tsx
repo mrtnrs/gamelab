@@ -57,7 +57,7 @@ const fallbackGames = [
 ]
 
 function AdminGamesContent() {
-  const [games, setGames] = useState([])
+  const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -85,8 +85,8 @@ function AdminGamesContent() {
   // Filter games based on search query and filters
   const filteredGames = games.filter((game) => {
     const matchesSearch = game.title.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || game.status.toLowerCase() === statusFilter.toLowerCase()
-    const matchesCategory = categoryFilter === 'all' || game.category.toLowerCase() === categoryFilter.toLowerCase()
+    const matchesStatus = statusFilter === 'all' || game.status?.toLowerCase() === statusFilter.toLowerCase()
+    const matchesCategory = categoryFilter === 'all' || game.category?.toLowerCase() === categoryFilter.toLowerCase()
     
     return matchesSearch && matchesStatus && matchesCategory
   })
@@ -122,184 +122,186 @@ function AdminGamesContent() {
   
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Games Management</h1>
-        <Link
-          href="/admin/games/new"
-          className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
-          <FiPlus className="mr-2 h-4 w-4" />
-          Add New Game
-        </Link>
-      </div>
+      <Header />
       
-      {/* Filters */}
-      <div className="bg-card rounded-lg shadow-sm p-4 mb-6 border border-border">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiSearch className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search games..."
-              className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          {/* Status Filter */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiFilter className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <select
-              className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-            </select>
-          </div>
-          
-          {/* Category Filter */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FiFilter className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <select
-              className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="all">All Categories</option>
-              {categories.filter(cat => cat !== 'all').map((category) => (
-                <option key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      {/* Games Table */}
-      <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-muted">
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Game</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">
-                    Loading games...
-                  </td>
-                </tr>
-              ) : currentGames.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">
-                    No games found. Try adjusting your filters.
-                  </td>
-                </tr>
-              ) : (
-                currentGames.map((game) => (
-                  <tr key={game.id} className="hover:bg-muted/50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 mr-3 relative overflow-hidden rounded">
-                          <Image
-                            src={game.image_url || 'https://via.placeholder.com/150'}
-                            alt={game.title}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{game.title}</div>
-                          <div className="text-sm text-muted-foreground">ID: {game.id}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {game.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        game.status === 'published' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-400' 
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/20 dark:text-yellow-400'
-                      }`}>
-                        {game.status === 'published' ? 'Published' : 'Draft'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(game.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link
-                          href={`/admin/games/${game.id}`}
-                          className="text-primary hover:text-primary/80"
-                        >
-                          <FiEdit2 className="h-5 w-5" />
-                        </Link>
-                        <button
-                          onClick={() => handleDeleteGame(game.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <FiTrash2 className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold">Games Management</h1>
+          <Link
+            href="/admin/games/new"
+            className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <FiPlus className="mr-2 h-4 w-4" />
+            Add New Game
+          </Link>
         </div>
         
-        {/* Pagination */}
-        {!loading && filteredGames.length > 0 && (
-          <div className="px-6 py-3 flex items-center justify-between border-t border-border">
-            <div className="text-sm text-muted-foreground">
-              Showing {indexOfFirstGame + 1} to {Math.min(indexOfLastGame, filteredGames.length)} of {filteredGames.length} games
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-md border border-border bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FiChevronLeft className="h-5 w-5" />
-              </button>
-              <div className="text-sm">
-                Page {currentPage} of {totalPages}
+        {/* Filters */}
+        <div className="bg-card rounded-lg shadow-sm p-4 mb-6 border border-border">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiSearch className="h-5 w-5 text-muted-foreground" />
               </div>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-md border border-border bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              <input
+                type="text"
+                placeholder="Search games..."
+                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiFilter className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <select
+                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <FiChevronRight className="h-5 w-5" />
-              </button>
+                <option value="all">All Statuses</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+            
+            {/* Category Filter */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiFilter className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <select
+                className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {categories.filter(cat => cat !== 'all').map((category) => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
-      </div>
         </div>
-      </main>
+        
+        {/* Games Table */}
+        <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Game</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center">
+                      Loading games...
+                    </td>
+                  </tr>
+                ) : currentGames.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center">
+                      No games found. Try adjusting your filters.
+                    </td>
+                  </tr>
+                ) : (
+                  currentGames.map((game) => (
+                    <tr key={game.id} className="hover:bg-muted/50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 flex-shrink-0 mr-3 relative overflow-hidden rounded">
+                            <Image
+                              src={game.image_url || 'https://via.placeholder.com/150'}
+                              alt={game.title}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">{game.title}</div>
+                            <div className="text-sm text-muted-foreground">ID: {game.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {game.category}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          game.status === 'published' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-400' 
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800/20 dark:text-yellow-400'
+                        }`}>
+                          {game.status === 'published' ? 'Published' : 'Draft'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {new Date(game.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Link
+                            href={`/admin/games/edit/${game.id}`}
+                            className="text-primary hover:text-primary/80"
+                          >
+                            <FiEdit2 className="h-5 w-5" />
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteGame(game.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <FiTrash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          {!loading && filteredGames.length > 0 && (
+            <div className="px-6 py-3 flex items-center justify-between border-t border-border">
+              <div className="text-sm text-muted-foreground">
+                Showing {indexOfFirstGame + 1} to {Math.min(indexOfLastGame, filteredGames.length)} of {filteredGames.length} games
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-md border border-border bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiChevronLeft className="h-5 w-5" />
+                </button>
+                <div className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-md border border-border bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       
       <Footer />
     </div>
