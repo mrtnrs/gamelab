@@ -5,13 +5,13 @@ import { FiLogOut } from 'react-icons/fi';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function AdminLogoutButton() {
-  const { adminLogout } = useAuth();
+  const { signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoading(true);
     try {
-      adminLogout();
+      await signOut();
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {

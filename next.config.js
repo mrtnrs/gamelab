@@ -8,15 +8,15 @@ const nextConfig = {
     domains: ['images.unsplash.com', 'via.placeholder.com', 'ifosxcolqtgtyprwnruv.supabase.co'],
     unoptimized: true,
   },
-  swcMinify: true,
   experimental: {
     esmExternals: true,
-},
-webpack: (config, { isServer }) => {
-  config.resolve.alias['@'] = require('path').resolve(__dirname, 'src');
-  config.resolve.alias['a'] = require('path').resolve(__dirname); // Add a/ for root
-  return config;
-},
+  },
+  webpack: (config) => {
+    const path = require('path');
+    config.resolve.alias['@'] = path.resolve(__dirname, 'src');
+    config.resolve.alias['a'] = path.resolve(__dirname); // Add a/ for root
+    return config;
+  },
 };
 
 module.exports = nextConfig;

@@ -45,8 +45,30 @@ const similarGames = [
   },
 ];
 
+// Define a type for the formatted game object
+type FormattedGame = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  feature_image: string;
+  year: string;
+  rating_average: number;
+  rating_count: number;
+  creator: {
+    name: string;
+    image: string;
+    social_link: string;
+  };
+  features: string[];
+  gallery: string[];
+  is_multiplayer?: boolean;
+  is_mobile_compatible?: boolean;
+  visit_count: number;
+};
+
 // Function to convert a game object to a display-friendly format
-const formatGameForDisplay = (game: Game) => {
+const formatGameForDisplay = (game: Game): FormattedGame => {
   return {
     id: game.id,
     title: game.title,
@@ -70,7 +92,7 @@ const formatGameForDisplay = (game: Game) => {
 };
 
 export default function GameDetailClient({ slug }: { slug: string }) {
-  const [game, setGame] = useState<any>(null);
+  const [game, setGame] = useState<FormattedGame | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedImage, setSelectedImage] = useState('');
@@ -107,11 +129,14 @@ export default function GameDetailClient({ slug }: { slug: string }) {
         toast.success('Rating submitted successfully!');
         
         // Update the game object with new rating
-        setGame(prev => ({
+        setGame((prev: FormattedGame | null) => {
+          if (!prev) return null;
+          return ({
           ...prev,
           rating_count: (prev.rating_count || 0) + 1,
           rating_average: ((prev.rating_average || 0) * (prev.rating_count || 0) + rating) / ((prev.rating_count || 0) + 1)
-        }));
+        });
+        });
       } else {
         toast.error(result.error || 'Failed to submit rating');
       }
