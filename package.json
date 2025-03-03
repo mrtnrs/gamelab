@@ -9,10 +9,9 @@
     "lint": "next lint",
     "deploy": "wrangler pages deploy out",
     "build:worker": "opennextjs-cloudflare",
-"dev:worker": "wrangler dev --port 8771",
-"preview:worker": "npm run build:worker && npm run dev:worker",
-"deploy:worker": "npm run build:worker && wrangler deploy"
-    
+    "dev:worker": "wrangler dev --port 8771",
+    "preview:worker": "npm run build:worker && npm run dev:worker",
+    "deploy:worker": "npm run build:worker && wrangler deploy"
   },
   "dependencies": {
     "@supabase/ssr": "^0.0.10",
@@ -24,6 +23,7 @@
     "react-icons": "^4.12.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^0.5.8",
     "@types/node": "^20",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
