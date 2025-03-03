@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "deploy": "npx wrangler pages deploy .next"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.8",
