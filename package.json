@@ -10,7 +10,8 @@
     "build:worker": "opennextjs-cloudflare",
     "dev:worker": "wrangler dev --port 8771",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "preview:worker": "npm run build:worker && npm run dev:worker"
+    "preview:worker": "npm run build:worker && npm run dev:worker",
+    "deploy": "npm run pages:build && wrangler pages deploy"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.8",
