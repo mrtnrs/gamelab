@@ -1,7 +1,6 @@
 "use client"
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { ThemeToggle } from './theme-toggle'
 import { FiSearch, FiMenu, FiX, FiUser, FiShield, FiLogOut, FiUpload } from 'react-icons/fi'
