@@ -24,14 +24,14 @@
     "react-dom": "^19.0.0",
     "react-icons": "^4.12.0",
     "vercel": "^41.3.0",
-    "tailwindcss": "^3.3.0"
+    "tailwindcss": "^3.3.0",
+    "autoprefixer": "^10.0.1"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^0.5.8",
     "@types/node": "^20",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "^15.2.0",
     "postcss": "^8",
