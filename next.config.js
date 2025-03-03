@@ -8,14 +8,10 @@ const nextConfig = {
     domains: ['images.unsplash.com', 'via.placeholder.com', 'ifosxcolqtgtyprwnruv.supabase.co'],
     unoptimized: true,
   },
-  trailingSlash: true,
-  distDir: 'out',
-  webpack: (config, { isServer }) => {
-    // Map '@/' to 'src/' to match tsconfig.json
-    config.resolve.alias['@'] = require('path').resolve(__dirname, 'src');
-    // No need for specific subpath aliases unless they’re outside src/
-    return config;
-  },
+  swcMinify: true,
+  experimental: {
+    esmExternals: true,
+},
 };
 
 module.exports = nextConfig;

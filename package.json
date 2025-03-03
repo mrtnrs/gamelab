@@ -23,7 +23,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^4.12.0",
-    "vercel": "^41.3.0"
+    "vercel": "^41.3.0",
+    "tailwindcss": "^3.3.0"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^0.5.8",
@@ -34,7 +35,6 @@
     "eslint": "^8",
     "eslint-config-next": "^15.2.0",
     "postcss": "^8",
-    "tailwindcss": "^3.3.0",
     "typescript": "^5.3.3",
     "wrangler": "^3.22.1"
   }
