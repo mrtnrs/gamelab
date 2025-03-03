@@ -23,7 +23,6 @@ const nextConfig = {
   },
   // Cloudflare Pages specific configuration
   trailingSlash: true,
-  output: 'export', // Static site generation for Cloudflare Pages
   distDir: '.next', // Specify the build output directory
 };
 
