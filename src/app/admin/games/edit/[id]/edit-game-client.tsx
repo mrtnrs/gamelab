@@ -7,9 +7,7 @@ import AdminRouteGuard from '@/components/admin-route-guard'
 import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
-function EditGameContent({ id }: { id: string | string[] }) {
-  // Ensure we have a single string ID
-  const gameId = Array.isArray(id) ? id[0] : id;
+function EditGameContent({ id }: { id: string }) {
   const router = useRouter()
   const [game, setGame] = useState<Game | null>(null)
   const [loading, setLoading] = useState(true)
@@ -18,8 +16,8 @@ function EditGameContent({ id }: { id: string | string[] }) {
   useEffect(() => {
     async function loadGame() {
       try {
-        if (gameId) {
-          const gameData = await gameService.getGameById(gameId)
+        if (id) {
+          const gameData = await gameService.getGameById(id)
           if (gameData) {
             setGame(gameData)
           } else {
@@ -35,7 +33,7 @@ function EditGameContent({ id }: { id: string | string[] }) {
     }
     
     loadGame()
-  }, [gameId])
+  }, [id])
   
   if (loading) {
     return (
@@ -71,7 +69,7 @@ function EditGameContent({ id }: { id: string | string[] }) {
   )
 }
 
-export default function EditGameClient({ id }: { id: string | string[] }) {
+export default function EditGameClient({ id }: { id: string }) {
   return (
     <AdminRouteGuard>
       <EditGameContent id={id} />

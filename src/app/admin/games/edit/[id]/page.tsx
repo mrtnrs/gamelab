@@ -1,8 +1,13 @@
 import Header from '@/components/header'
 import Footer from '@/components/footer'
 import EditGameClient from './edit-game-client'
+import { Metadata } from 'next'
 
-export default function EditGamePage({ params }: { params: { id: string | string[] } }) {
+type Props = {
+  params: { id: string }
+}
+
+export default function EditGamePage({ params }: Props) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
