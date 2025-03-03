@@ -12,6 +12,11 @@ const nextConfig = {
   experimental: {
     esmExternals: true,
 },
+webpack: (config, { isServer }) => {
+  config.resolve.alias['@'] = require('path').resolve(__dirname, 'src');
+  config.resolve.alias['a'] = require('path').resolve(__dirname); // Add a/ for root
+  return config;
+},
 };
 
 module.exports = nextConfig;

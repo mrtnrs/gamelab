@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Header from 'a/src/components/header'
-import Footer from 'a/src/components/footer'
-import GameForm from 'a/src/components/game-form'
-import AdminRouteGuard from 'a/src/components/admin-route-guard'
-import { gameService } from 'a/src/services/game-service'
+import Header from '@/components/header'
+import Footer from '@/components/footer'
+import GameForm from '@/components/game-form'
+import AdminRouteGuard from '@/components/admin-route-guard'
+import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
 function EditGameContent() {
