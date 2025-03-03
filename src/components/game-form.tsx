@@ -9,9 +9,10 @@ import { Game, GameFormData } from '@/types/game';
 interface GameFormProps {
   gameId?: string;
   initialData?: Partial<Game>;
+  isEditing?: boolean;
 }
 
-export default function GameForm({ gameId, initialData }: GameFormProps) {
+export default function GameForm({ gameId, initialData, isEditing }: GameFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -29,10 +30,10 @@ export default function GameForm({ gameId, initialData }: GameFormProps) {
     ...initialData
   });
 
-  const isEditing = !!gameId;
+  const isEditingMode = isEditing !== undefined ? isEditing : !!gameId;
 
   useEffect(() => {
-    if (isEditing && gameId && !initialData) {
+    if (isEditingMode && gameId && !initialData) {
       const fetchGame = async () => {
         setLoading(true);
         try {
@@ -122,7 +123,7 @@ export default function GameForm({ gameId, initialData }: GameFormProps) {
       };
 
       let result;
-      if (isEditing && gameId) {
+      if (isEditingMode && gameId) {
         // Update existing game
         result = await gameService.updateGame(gameId, finalFormData);
       } else {
@@ -133,11 +134,11 @@ export default function GameForm({ gameId, initialData }: GameFormProps) {
       if (result.success) {
         router.push('/admin/games');
       } else {
-        alert(`Failed to ${isEditing ? 'update' : 'create'} game: ${result.error?.message || 'Unknown error'}`);
+        alert(`Failed to ${isEditingMode ? 'update' : 'create'} game: ${result.error?.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error(`Error ${isEditing ? 'updating' : 'creating'} game:`, error);
-      alert(`An error occurred while ${isEditing ? 'updating' : 'creating'} the game`);
+      console.error(`Error ${isEditingMode ? 'updating' : 'creating'} game:`, error);
+      alert(`An error occurred while ${isEditingMode ? 'updating' : 'creating'} the game`);
     } finally {
       setLoading(false);
     }
@@ -350,7 +351,7 @@ export default function GameForm({ gameId, initialData }: GameFormProps) {
           ) : (
             <>
               <FiSave className="inline-block mr-2 h-4 w-4" />
-              {isEditing ? 'Update Game' : 'Create Game'}
+              {isEditingMode ? 'Update Game' : 'Create Game'}
             </>
           )}
         </button>

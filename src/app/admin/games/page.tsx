@@ -11,7 +11,7 @@ import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
 // Fallback game data in case database is empty
-const fallbackGames = [
+const fallbackGames: Game[] = [
   {
     id: '1',
     title: 'Space Explorer',
@@ -85,8 +85,8 @@ function AdminGamesContent() {
   // Filter games based on search query and filters
   const filteredGames = games.filter((game) => {
     const matchesSearch = game.title.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || game.status?.toLowerCase() === statusFilter.toLowerCase()
-    const matchesCategory = categoryFilter === 'all' || game.category?.toLowerCase() === categoryFilter.toLowerCase()
+    const matchesStatus = statusFilter === 'all' || game.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesCategory = categoryFilter === 'all' || game.category.toLowerCase() === categoryFilter.toLowerCase()
     
     return matchesSearch && matchesStatus && matchesCategory
   })
@@ -118,7 +118,7 @@ function AdminGamesContent() {
   }
   
   // Get unique categories for filter
-  const categories = ['all', ...new Set(games.map((game) => game.category?.toLowerCase()).filter(Boolean))]
+  const categories = ['all', ...new Set(games.map((game) => game.category.toLowerCase()))]
   
   return (
     <div>

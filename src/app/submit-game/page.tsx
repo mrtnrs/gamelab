@@ -9,7 +9,21 @@ import Footer from '@/components/footer'
 export default function SubmitGamePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  type FormDataType = {
+    title: string;
+    description: string;
+    category: string;
+    developer: string;
+    email: string;
+    gameUrl: string;
+    thumbnailUrl: string;
+    bannerUrl: string;
+    screenshots: string[];
+    features: string[];
+    [key: string]: string | string[];
+  };
+
+  const [formData, setFormData] = useState<FormDataType>({
     title: '',
     description: '',
     category: '',
@@ -23,7 +37,7 @@ export default function SubmitGamePage() {
   })
   
   // Handle input change
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData({
       ...formData,
@@ -32,7 +46,7 @@ export default function SubmitGamePage() {
   }
   
   // Handle array input change
-  const handleArrayChange = (index, field, value) => {
+  const handleArrayChange = (index: number, field: keyof FormDataType, value: string) => {
     const newArray = [...formData[field]]
     newArray[index] = value
     setFormData({
@@ -42,7 +56,7 @@ export default function SubmitGamePage() {
   }
   
   // Add new field to array
-  const addArrayField = (field) => {
+  const addArrayField = (field: keyof FormDataType) => {
     setFormData({
       ...formData,
       [field]: [...formData[field], '']
@@ -50,7 +64,7 @@ export default function SubmitGamePage() {
   }
   
   // Remove field from array
-  const removeArrayField = (field, index) => {
+  const removeArrayField = (field: keyof FormDataType, index: number) => {
     const newArray = [...formData[field]]
     newArray.splice(index, 1)
     setFormData({
@@ -60,7 +74,7 @@ export default function SubmitGamePage() {
   }
   
   // Handle form submission
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     

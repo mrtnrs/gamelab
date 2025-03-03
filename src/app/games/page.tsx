@@ -7,7 +7,17 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 
 // Mock data for games
-const MOCK_GAMES = [
+interface GameItem {
+  id: string;
+  title: string;
+  slug: string;
+  image: string;
+  category: string;
+  rating: number;
+  year: string;
+}
+
+const MOCK_GAMES: GameItem[] = [
   {
     id: '1',
     title: 'Cosmic Odyssey',
@@ -136,8 +146,8 @@ const SORT_OPTIONS = [
 ];
 
 export default function GamesPage() {
-  const [games, setGames] = useState(MOCK_GAMES)
-  const [visibleGames, setVisibleGames] = useState([])
+  const [games, setGames] = useState<GameItem[]>(MOCK_GAMES)
+  const [visibleGames, setVisibleGames] = useState<GameItem[]>([])
   const [category, setCategory] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'

@@ -6,7 +6,7 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 import GameForm from '@/components/game-form'
 import AdminRouteGuard from '@/components/admin-route-guard'
-import { getGameById } from '@/services/game-service'
+import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
 function EditGameContent() {
@@ -20,7 +20,7 @@ function EditGameContent() {
     async function loadGame() {
       try {
         if (params.id) {
-          const gameData = await getGameById(params.id as string)
+          const gameData = await gameService.getGameById(params.id as string)
           if (gameData) {
             setGame(gameData)
           } else {
