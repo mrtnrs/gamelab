@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm install && next build",
     "start": "next start",
     "lint": "next lint",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "deploy": "wrangler pages deploy out"
+    "deploy": "wrangler pages deploy out",
+    "build:worker": "opennextjs-cloudflare",
+"dev:worker": "wrangler dev --port 8771",
+"preview:worker": "npm run build:worker && npm run dev:worker",
+"deploy:worker": "npm run build:worker && wrangler deploy"
+    
   },
   "dependencies": {
     "@supabase/ssr": "^0.0.10",
