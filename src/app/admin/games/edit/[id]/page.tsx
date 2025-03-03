@@ -1,13 +1,17 @@
-import Header from '@/components/header'
-import Footer from '@/components/footer'
-import EditGameClient from './edit-game-client'
-import { Metadata } from 'next'
+import Header from '@/components/header';
+import Footer from '@/components/footer';
+import EditGameClient from './edit-game-client';
+import { Metadata } from 'next';
 
+// Define the props type with params as a Promise
 type Props = {
-  params: { id: string }
-}
+  params: Promise<{ id: string }>; // Updated for Next.js 15
+};
 
+// Async Server Component
 export default async function EditGamePage({ params }: Props) {
+  const { id } = await params; // Await the Promise to get the id
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -18,10 +22,10 @@ export default async function EditGamePage({ params }: Props) {
             <p className="text-muted-foreground mt-2">Update game information</p>
           </div>
           
-          <EditGameClient id={params.id} />
+          <EditGameClient id={id} /> {/* Pass the resolved id */}
         </div>
       </main>
       <Footer />
     </div>
-  )
+  );
 }
