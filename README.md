@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GameLab - AI Game Platform
+
+GameLab is a modern static site for showcasing AI-generated games with a Netflix-like discovery experience. The platform features a Supabase database integration for game management and a simple admin authentication system.
+
+## Features
+
+- **Game Showcase**: Browse and discover AI-generated games in a Netflix-style interface
+- **Game Submission**: Users can submit their own games for review
+- **Admin Management**: Simple admin interface to manage game submissions
+- **Supabase Integration**: Database storage for games and images
+- **Static Site Generation**: Optimized for Cloudflare Pages deployment
+
+## Tech Stack
+
+- **Frontend**: Next.js 14, React, Tailwind CSS
+- **Database**: Supabase
+- **Authentication**: Simple admin password protection
+- **Deployment**: Cloudflare Pages
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ and npm/yarn
+- Supabase account and project
+
+### Environment Setup
+
+Create a `.env.local` file with your Supabase credentials:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Installation
 
 ```bash
+# Install dependencies
+npm install
+# or
+yarn install
+
+# Run development server
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project is configured for deployment on Cloudflare Pages:
 
-## Learn More
+1. Push your code to GitHub
+2. Connect your repository to Cloudflare Pages
+3. Configure the build settings:
+   - Build command: `npm run build` or `yarn build`
+   - Build output directory: `/out`
+4. Add your environment variables in the Cloudflare Pages dashboard
 
-To learn more about Next.js, take a look at the following resources:
+## Database Schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The Supabase database includes the following tables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **games**: Stores game information including title, description, image URL, etc.
 
-## Deploy on Vercel
+## Admin Access
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Access the admin area by navigating to `/admin` and logging in with your admin credentials.
