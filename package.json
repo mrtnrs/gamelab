@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "deploy": "npm run pages:build && wrangler pages deploy"
+    "export": "next build && next export"
   },
   "dependencies": {
     "@cloudflare/next-on-pages": "^1.13.8",
