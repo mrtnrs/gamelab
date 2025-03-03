@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 type AuthContextType = {
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Check if admin status is stored in localStorage on component mount
-  useState(() => {
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedAdminStatus = localStorage.getItem('gamelab_admin');
       if (storedAdminStatus === 'true') {
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setIsLoading(false);
-  });
+  }, []);
 
   const adminLogin = async (password: string) => {
     setIsLoading(true);
