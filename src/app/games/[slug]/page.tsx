@@ -9,7 +9,7 @@ type Props = {
   params: { slug: string }
 }
 
-export default function GamePage({ params }: Props) {
+export default async function GamePage({ params }: Props) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />

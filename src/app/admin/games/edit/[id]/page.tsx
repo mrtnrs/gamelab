@@ -7,7 +7,7 @@ type Props = {
   params: { id: string }
 }
 
-export default function EditGamePage({ params }: Props) {
+export default async function EditGamePage({ params }: Props) {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
