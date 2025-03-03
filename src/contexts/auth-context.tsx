@@ -2,63 +2,109 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 type AuthContextType = {
+  user: User | null;
+  session: Session | null;
   isAdmin: boolean;
   isLoading: boolean;
-  adminLogin: (password: string) => Promise<{ success: boolean, error?: string }>;
-  adminLogout: () => void;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// The email address that's allowed to access admin
+const ADMIN_EMAIL = 'raesmaarten@gmail.com';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // In a real app, you would use a more secure approach
-  // This is a simplified version for static site deployment
-  const ADMIN_PASSWORD = 'admin123'; // In production, use environment variables
-  
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Check if admin status is stored in localStorage on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedAdminStatus = localStorage.getItem('gamelab_admin');
-      if (storedAdminStatus === 'true') {
-        setIsAdmin(true);
+    // Get initial session
+    const initializeAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+        setUser(data.session?.user || null);
+        
+        // Check if user is admin (has the allowed email)
+        if (data.session?.user?.email === ADMIN_EMAIL) {
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
+        
+        // Check if user is admin (has the allowed email)
+        if (currentSession?.user?.email === ADMIN_EMAIL) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const adminLogin = async (password: string) => {
+  const signInWithGoogle = async () => {
     setIsLoading(true);
-    
-    // Simple password check - in a real app, use a secure API
-    if (password === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('gamelab_admin', 'true');
-      }
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/admin`,
+        },
+      });
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
       setIsLoading(false);
-      return { success: true };
-    } else {
-      setIsLoading(false);
-      return { success: false, error: 'Invalid admin password' };
     }
   };
 
-  const adminLogout = () => {
-    setIsAdmin(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('gamelab_admin');
+  const signOut = async () => {
+    setIsLoading(true);
+    try {
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setIsLoading(false);
     }
-    router.push('/');
   };
 
   return (
-    <AuthContext.Provider value={{ isAdmin, isLoading, adminLogin, adminLogout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      isAdmin, 
+      isLoading, 
+      signInWithGoogle, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );

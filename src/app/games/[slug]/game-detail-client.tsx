@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import GameCarousel from '@/components/game-carousel'
-import { FiPlay, FiPlus, FiThumbsUp, FiShare2, FiDownload } from 'react-icons/fi'
+import { FiPlay, FiPlus, FiThumbsUp, FiShare2, FiDownload, FiStar } from 'react-icons/fi'
+import { gameService } from '@/services/game-service'
+import { Game } from '@/types/game'
+import { toast } from 'react-hot-toast'
 
-// Mock data for similar games
+// Mock data for similar games - to be replaced with real data later
 const similarGames = [
   {
     id: "2",
@@ -42,27 +45,28 @@ const similarGames = [
   },
 ];
 
-// Mock game data (in a real app, this would come from Supabase)
-const mockGameData = {
-  id: "1",
-  title: "Army of the Dead",
-  slug: "army-of-the-dead",
-  description: "A group of mercenaries takes the ultimate gamble by venturing into a quarantine zone following a zombie outbreak in Las Vegas in hopes of pulling off an impossible heist. This action-packed game combines survival horror with strategic gameplay, challenging players to navigate a zombie-infested city while completing mission objectives.",
-  feature_image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070",
-  year: "2023",
-  rating: 9.5,
-  creator: {
-    name: "Quantum Studios",
-    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=2074",
-    social_link: "https://twitter.com"
-  },
-  features: ["Multiplayer", "Open World", "First Person", "Action", "Survival"],
-  gallery: [
-    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070",
-    "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=2071",
-    "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=2059",
-    "https://images.unsplash.com/photo-1559163499-413811fb2344?q=80&w=2070"
-  ]
+// Function to convert a game object to a display-friendly format
+const formatGameForDisplay = (game: Game) => {
+  return {
+    id: game.id,
+    title: game.title,
+    slug: game.title.toLowerCase().replace(/\s+/g, '-'),
+    description: game.description,
+    feature_image: game.image_url,
+    year: new Date(game.created_at).getFullYear().toString(),
+    rating_average: game.rating_average || 0,
+    rating_count: game.rating_count || 0,
+    creator: {
+      name: game.developer,
+      image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=2074", // Default image
+      social_link: game.developer_url || "#"
+    },
+    features: game.tags || [],
+    gallery: game.gallery_images || [game.image_url],
+    is_multiplayer: game.is_multiplayer,
+    is_mobile_compatible: game.is_mobile_compatible,
+    visit_count: game.visit_count || 0
+  };
 };
 
 export default function GameDetailClient({ slug }: { slug: string }) {
@@ -71,13 +75,79 @@ export default function GameDetailClient({ slug }: { slug: string }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedImage, setSelectedImage] = useState('');
   const [isDesktop, setIsDesktop] = useState(false);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [isRatingSubmitted, setIsRatingSubmitted] = useState(false);
+  const [isRatingLoading, setIsRatingLoading] = useState(false);
+  
+  // Check if user has already rated this game from localStorage
+  useEffect(() => {
+    if (game?.id) {
+      const storedRating = localStorage.getItem(`game_rating_${game.id}`);
+      if (storedRating) {
+        setUserRating(parseInt(storedRating));
+        setIsRatingSubmitted(true);
+      }
+    }
+  }, [game?.id]);
+  
+  // Function to handle rating submission
+  const handleRateGame = async (rating: number) => {
+    if (!game?.id || isRatingSubmitted) return;
+    
+    setIsRatingLoading(true);
+    
+    try {
+      const result = await gameService.rateGame(game.id, rating);
+      
+      if (result.success) {
+        // Save to localStorage to prevent multiple ratings
+        localStorage.setItem(`game_rating_${game.id}`, rating.toString());
+        setUserRating(rating);
+        setIsRatingSubmitted(true);
+        toast.success('Rating submitted successfully!');
+        
+        // Update the game object with new rating
+        setGame(prev => ({
+          ...prev,
+          rating_count: (prev.rating_count || 0) + 1,
+          rating_average: ((prev.rating_average || 0) * (prev.rating_count || 0) + rating) / ((prev.rating_count || 0) + 1)
+        }));
+      } else {
+        toast.error(result.error || 'Failed to submit rating');
+      }
+    } catch (error) {
+      console.error('Error rating game:', error);
+      toast.error('An error occurred while submitting your rating');
+    } finally {
+      setIsRatingLoading(false);
+    }
+  };
   
   useEffect(() => {
-    // In a real app, fetch from Supabase
-    // For now, use mock data
-    setGame(mockGameData);
-    setSelectedImage(mockGameData.feature_image);
-    setLoading(false);
+    const fetchGameData = async () => {
+      setLoading(true);
+      try {
+        const gameData = await gameService.getGameBySlug(slug);
+        
+        if (gameData) {
+          const formattedGame = formatGameForDisplay(gameData);
+          setGame(formattedGame);
+          setSelectedImage(formattedGame.feature_image);
+        } else {
+          // If game not found, show error
+          toast.error('Game not found');
+        }
+      } catch (error) {
+        console.error('Error fetching game:', error);
+        toast.error('Failed to load game data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (slug) {
+      fetchGameData();
+    }
     
     // Check if we're on desktop
     const checkIfDesktop = () => {
@@ -132,7 +202,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
             
             <div className="flex items-center space-x-4 mb-4">
               <span className="text-sm bg-primary text-white px-2 py-1 rounded">
-                {game.rating}/10
+                {game.rating_average ? game.rating_average.toFixed(1) : 'N/A'}/5
               </span>
               {game.year && (
                 <span className="text-sm">{game.year}</span>
@@ -266,12 +336,42 @@ export default function GameDetailClient({ slug }: { slug: string }) {
                     <p>{game.creator.name}</p>
                   </div>
                   <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Visits</h3>
+                    <p>{game.visit_count?.toLocaleString() || 0}</p>
+                  </div>
+                  <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Rating</h3>
-                    <p>{game.rating}/10</p>
+                    <div className="flex items-center space-x-2">
+                      <p>{game.rating_average ? game.rating_average.toFixed(1) : 'N/A'}/5</p>
+                      <span className="text-xs text-muted-foreground">({game.rating_count || 0} ratings)</span>
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Features</h3>
                     <p>{game.features.join(', ')}</p>
+                  </div>
+                  
+                  {/* Rating Component */}
+                  <div className="mt-6 p-4 bg-accent rounded-lg">
+                    <h3 className="text-sm font-medium mb-2">Rate this game</h3>
+                    <div className="flex items-center space-x-1 mb-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => !isRatingSubmitted && handleRateGame(star)}
+                          disabled={isRatingSubmitted || isRatingLoading}
+                          className={`text-xl transition-colors ${isRatingLoading ? 'opacity-50' : ''} ${userRating && userRating >= star ? 'text-yellow-500' : 'text-gray-500 hover:text-yellow-400'}`}
+                          aria-label={`Rate ${star} stars`}
+                        >
+                          <FiStar className={userRating && userRating >= star ? 'fill-current' : ''} />
+                        </button>
+                      ))}
+                    </div>
+                    {isRatingSubmitted ? (
+                      <p className="text-xs text-green-500">Thanks for your rating!</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Click to rate</p>
+                    )}
                   </div>
                 </div>
               </div>

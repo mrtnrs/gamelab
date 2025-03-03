@@ -76,10 +76,148 @@ export const gameService = {
         return null;
       }
       
+      // Increment visit count in the background
+      this.incrementVisitCount(id).catch(err => {
+        console.error('Error incrementing visit count:', err);
+      });
+      
       return data;
     } catch (error) {
       console.error('Error in getGameById:', error);
       return null;
+    }
+  },
+  
+  async getGameBySlug(slug: string): Promise<Game | null> {
+    try {
+      // Convert slug to title format by replacing hyphens with spaces and capitalizing words
+      const title = slug
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .ilike('title', title)
+        .eq('status', 'published')
+        .single();
+      
+      if (error) {
+        console.error(`Error fetching game with slug ${slug}:`, error);
+        return null;
+      }
+      
+      // Increment visit count in the background
+      if (data) {
+        this.incrementVisitCount(data.id).catch(err => {
+          console.error('Error incrementing visit count:', err);
+        });
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getGameBySlug:', error);
+      return null;
+    }
+  },
+  
+  async incrementVisitCount(id: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('increment_game_visit_count', { game_id: id });
+      
+      if (error) {
+        console.error(`Error incrementing visit count for game ${id}:`, error);
+      }
+    } catch (error) {
+      console.error('Error in incrementVisitCount:', error);
+    }
+  },
+  
+  async rateGame(id: string, rating: number): Promise<{ success: boolean; error?: any }> {
+    try {
+      if (rating < 1 || rating > 5) {
+        return { success: false, error: 'Rating must be between 1 and 5' };
+      }
+      
+      // First, insert the rating into the game_ratings table
+      const { error: ratingError } = await supabase
+        .from('game_ratings')
+        .insert([
+          { 
+            game_id: id,
+            rating,
+            // We don't have user_id or user_ip here, but in a real app you would include them
+          }
+        ]);
+      
+      if (ratingError) {
+        // If there's a unique constraint violation, the user has already rated this game
+        if (ratingError.code === '23505') { // PostgreSQL unique violation code
+          return { success: false, error: 'You have already rated this game' };
+        }
+        console.error(`Error rating game ${id}:`, ratingError);
+        return { success: false, error: ratingError };
+      }
+      
+      // Then, update the game's rating stats
+      const { error: updateError } = await supabase.rpc('update_game_rating_stats', { 
+        game_id: id,
+        new_rating: rating
+      });
+      
+      if (updateError) {
+        console.error(`Error updating rating stats for game ${id}:`, updateError);
+        return { success: false, error: updateError };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in rateGame:', error);
+      return { success: false, error };
+    }
+  },
+  
+  async getTrendingGames(limit: number = 5): Promise<Game[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published')
+        .order('visit_count', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching trending games:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getTrendingGames:', error);
+      return [];
+    }
+  },
+  
+  async getTopRatedGames(limit: number = 5): Promise<Game[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published')
+        .gt('rating_count', 0) // Only include games with at least one rating
+        .order('rating_average', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching top rated games:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getTopRatedGames:', error);
+      return [];
     }
   },
   
@@ -177,7 +315,7 @@ export const gameService = {
       const filePath = `game-images/${fileName}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('game-assets')
+        .from('gameimages')
         .upload(filePath, file);
       
       if (uploadError) {
@@ -186,12 +324,43 @@ export const gameService = {
       }
       
       const { data } = supabase.storage
-        .from('game-assets')
+        .from('gameimages')
         .getPublicUrl(filePath);
       
       return { success: true, url: data.publicUrl };
     } catch (error) {
       console.error('Error in uploadGameImage:', error);
+      return { success: false, error };
+    }
+  },
+
+  async uploadGalleryImages(files: File[]): Promise<{ success: boolean; urls?: string[]; error?: any }> {
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `game-images/gallery/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('gameimages')
+          .upload(filePath, file);
+        
+        if (uploadError) {
+          console.error('Error uploading gallery image:', uploadError);
+          throw uploadError;
+        }
+        
+        const { data } = supabase.storage
+          .from('gameimages')
+          .getPublicUrl(filePath);
+        
+        return data.publicUrl;
+      });
+      
+      const urls = await Promise.all(uploadPromises);
+      return { success: true, urls };
+    } catch (error) {
+      console.error('Error in uploadGalleryImages:', error);
       return { success: false, error };
     }
   }
