@@ -7,6 +7,8 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
+export const runtime = 'edge';
+
 // Async Server Component
 export default async function GamePage({ params }: Props) {
   const { slug } = await params; // Await the Promise to get the slug
