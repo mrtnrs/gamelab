@@ -19,9 +19,12 @@ const nextConfig = {
         hostname: 'ifosxcolqtgtyprwnruv.supabase.co',
       },
     ],
+    unoptimized: true, // This helps with Cloudflare Pages deployment
   },
   // Cloudflare Pages specific configuration
   trailingSlash: true,
+  output: 'export', // Static site generation for Cloudflare Pages
+  distDir: '.next', // Specify the build output directory
 };
 
 module.exports = nextConfig;
