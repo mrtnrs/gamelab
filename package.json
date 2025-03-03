@@ -10,6 +10,7 @@
     "deploy": "wrangler pages deploy out",
     "build:worker": "opennextjs-cloudflare",
     "dev:worker": "wrangler dev --port 8771",
+    "pages:build": "npx @cloudflare/next-on-pages",
     "preview:worker": "npm run build:worker && npm run dev:worker",
     "deploy:worker": "npm run build:worker && wrangler deploy"
   },
