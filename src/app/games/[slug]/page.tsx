@@ -65,7 +65,8 @@ export async function generateMetadata(
 
 // Static generation configuration
 export const dynamicParams = false; // Only pre-render known slugs at build time
-// export const runtime = 'edge'; // Uncomment if you want Edge runtime
+// Note: We're using dynamicParams = false for static generation
+// We don't need edge runtime as we're pre-rendering all pages at build time
 
 // Main page component
 export default async function GamePage({ params }: Props) {

@@ -4,14 +4,14 @@ import GamePlayClient from './game-play-client';
 import { supabase } from '@/utils/supabase';
 import { Metadata, ResolvingMetadata } from 'next';
 import { gameService } from '@/services/game-service';
-import { generateSlug } from '@/utils/slug';
 
 // Define props type consistently for both page and metadata
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-export const dynamicParams = false;
+// Static generation configuration
+export const dynamicParams = false; // Only pre-render known slugs at build time
 
 // Generate metadata for the game play page
 export async function generateMetadata(
@@ -67,9 +67,8 @@ export async function generateMetadata(
   };
 }
 
-// Static generation configuration
- // Only pre-render known slugs at build time
-// export const runtime = 'edge'; // Uncomment if you want Edge runtime
+// Note: We're using dynamicParams = false for static generation
+// We don't need edge runtime as we're pre-rendering all pages at build time
 
 // Main page component
 export default async function GamePlayPage({ params }: Props) {
@@ -91,7 +90,7 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
   try {
     const { data: games, error } = await supabase
       .from('games')
-      .select('title, slug') // Get both title and slug if available
+      .select('title') // Update to 'slug' if your table has a slug column
       .eq('status', 'published');
 
     if (error) {
@@ -99,21 +98,9 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
       return [];
     }
 
-    if (!games || games.length === 0) {
-      console.log('No published games found for static paths');
-      return [];
-    }
-
-    console.log(`Generating static paths for ${games.length} games`);
-
-    // For each game, use the slug from the database or generate one from the title
-    const paths = games.map((game) => {
-      const slug = game.slug || generateSlug(game.title);
-      console.log(`Generated slug for "${game.title}": ${slug}`);
-      return { slug };
-    });
-
-    return paths;
+    return games.map((game) => ({
+      slug: game.title.toLowerCase().replace(/\s+/g, '-'),
+    }));
   } catch (error) {
     console.error('Error in generateStaticParams:', error);
     return [];
