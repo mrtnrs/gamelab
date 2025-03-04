@@ -1,8 +1,4 @@
 
-
-
-
-
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -24,6 +20,9 @@ export const metadata: Metadata = {
   title: "GameLab - AI Created Games",
   description: "Discover AI-created games in a beautiful Netflix-like interface",
 };
+
+export const runtime = "nodejs";
+export const dynamic = "force-static";
 
 export default function RootLayout({
   children,
