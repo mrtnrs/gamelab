@@ -11,10 +11,21 @@ const nextConfig = {
   experimental: {
     esmExternals: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer, nextRuntime }) => {
     const path = require('path');
     config.resolve.alias['@'] = path.resolve(__dirname, 'src');
     config.resolve.alias['a'] = path.resolve(__dirname); // Add a/ for root
+    
+    // Add polyfills for edge runtime
+    if (nextRuntime === 'edge') {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        url: require.resolve('url/'),
+        buffer: require.resolve('buffer/'),
+        stream: require.resolve('stream-browserify'),
+      };
+    }
+    
     return config;
   },
 };

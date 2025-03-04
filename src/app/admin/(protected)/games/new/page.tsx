@@ -2,6 +2,9 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 import NewGameClient from './new-game-client'
 
+// Required for Cloudflare Pages deployment
+// export const runtime = 'edge';
+
 // Server Component
 export default async function NewGamePage() {
   return (

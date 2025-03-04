@@ -8,7 +8,6 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import ProtectedRoute from '@/components/protected-route'
 import { useAuth } from '@/contexts/auth-context'
 
-export const runtime = 'edge';
 
 export default function AdminLayout({
   children,

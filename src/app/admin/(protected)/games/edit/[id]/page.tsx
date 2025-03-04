@@ -7,8 +7,8 @@ type Props = {
   params: Promise<{ id: string }>; // Correct typing for dynamic routes
 };
 
-export const runtime = 'edge';
-// Removed edge runtime directive to fix Cloudflare deployment issues
+// Required for Cloudflare Pages deployment
+// export const runtime = 'edge';
 
 // Async Server Component
 export default async function EditGamePage({ params }: Props) {
