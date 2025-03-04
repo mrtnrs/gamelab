@@ -5,6 +5,7 @@ import GameCarousel from '@/components/game-carousel';
 import { gameService } from '@/services/game-service';
 import { Game } from '@/types/game';
 import BookmarkedGamesSection from '@/components/bookmarked-games-section';
+import { generateSlug } from '@/utils/slug';
 
 // Fallback data in case database is empty
 const fallbackFeaturedGame = {
@@ -46,14 +47,22 @@ const fallbackGames = [
 
 // Helper function to convert Game to carousel format
 function formatGamesForCarousel(games: Game[]) {
-  return games.map(game => ({
-    id: game.id,
-    title: game.title,
-    slug: game.title.toLowerCase().replace(/\s+/g, '-'),
-    image: game.image_url,
-    year: new Date(game.created_at).getFullYear().toString(),
-    rating: game.rating_average ? Math.round(game.rating_average * 10) / 10 : undefined
-  }));
+  return games.map(game => {
+    // Use the slug from the game object if available, otherwise generate it
+    const slug = game.slug || generateSlug(game.title);
+    // Use a placeholder image if image_url is missing
+    const defaultImage = '/placeholder-game.jpg';
+    const imageUrl = game.image_url || defaultImage;
+    
+    return {
+      id: game.id,
+      title: game.title,
+      slug: slug,
+      image: imageUrl,
+      year: new Date(game.created_at).getFullYear().toString(),
+      rating: game.rating_average ? Math.round(game.rating_average * 10) / 10 : undefined
+    };
+  });
 }
 
 export default async function Home() {
@@ -71,8 +80,8 @@ export default async function Home() {
     id: featuredGames[0].id,
     title: featuredGames[0].title,
     description: featuredGames[0].description,
-    slug: featuredGames[0].title.toLowerCase().replace(/\s+/g, '-'),
-    image: featuredGames[0].image_url,
+    slug: featuredGames[0].slug || generateSlug(featuredGames[0].title),
+    image: featuredGames[0].image_url || '/placeholder-game.jpg',
     year: new Date(featuredGames[0].created_at).getFullYear().toString(),
     rating: featuredGames[0].rating_average ? 
       `${Math.round(featuredGames[0].rating_average * 10) / 10}/5` : 
