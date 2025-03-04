@@ -23,8 +23,8 @@ export default async function EditGamePage({ params }: Props) {
             <h1 className="text-3xl font-bold">Edit Game</h1>
             <p className="text-muted-foreground mt-2">Update game information</p>
           </div>
-          
-          <EditGameClient id={id} /> {/* Pass the resolved id */}
+{/*           
+          <EditGameClient id={id} /> Pass the resolved id */}
         </div>
       </main>
       <Footer />
