@@ -3,16 +3,19 @@ import Footer from '@/components/footer';
 import EditGameClient from './edit-game-client';
 
 // Define the props type for Next.js 15
-type Props = {
-  params: Promise<{ id: string }>; // Correct typing for dynamic routes
-};
+// type Props = {
+//   params: Promise<{ id: string }>; // Correct typing for dynamic routes
+// };
 
 // Required for Cloudflare Pages deployment
-export const runtime = 'edge';
+// export const runtime = 'edge';
 
 // Async Server Component
-export default async function EditGamePage({ params }: Props) {
-  const { id } = await params; // Access id directly from params
+// export default async function EditGamePage({ params }: Props) {
+//   const { id } = await params; // Access id directly from params
+
+export default async function EditGamePage() {
+  // const { id } = await params; // Access id directly from params
 
   return (
     <div className="flex flex-col min-h-screen">
