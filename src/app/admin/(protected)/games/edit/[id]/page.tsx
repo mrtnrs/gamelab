@@ -8,7 +8,7 @@ type Props = {
 };
 
 // Required for Cloudflare Pages deployment
-// export const runtime = 'edge';
+export const runtime = 'edge';
 
 // Async Server Component
 export default async function EditGamePage({ params }: Props) {
