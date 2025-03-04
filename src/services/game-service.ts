@@ -715,6 +715,8 @@ export const gameService = {
   
   async getSimilarGames(gameId: string, tags: string[], limit: number = 5): Promise<Game[]> {
     try {
+      let result: Game[] = [];
+      
       // First try to find games with matching tags
       if (tags && tags.length > 0) {
         const { data, error } = await supabase
@@ -728,48 +730,62 @@ export const gameService = {
         
         if (error) {
           console.error(`Error fetching similar games for game ${gameId}:`, error);
-          return [];
+        } else if (data) {
+          result = data;
         }
-        
-        if (data && data.length >= limit) {
-          return data;
-        }
-        
-        // If we didn't get enough games with matching tags, get some popular games to fill the list
-        const remainingLimit = limit - (data?.length || 0);
-        if (remainingLimit > 0) {
-          const { data: popularGames, error: popularError } = await supabase
-            .from('games')
-            .select('*')
-            .neq('id', gameId)
-            .eq('status', 'published')
-            .not('id', 'in', data?.map(g => g.id) || [])
-            .order('visit_count', { ascending: false })
-            .limit(remainingLimit);
-          
-          if (!popularError && popularGames) {
-            return [...(data || []), ...popularGames];
-          }
-        }
-        
-        return data || [];
       }
       
-      // If no tags, just get popular games
-      const { data, error } = await supabase
-        .from('games')
-        .select('*')
-        .neq('id', gameId)
-        .eq('status', 'published')
-        .order('visit_count', { ascending: false })
-        .limit(limit);
-      
-      if (error) {
-        console.error(`Error fetching popular games for game ${gameId}:`, error);
-        return [];
+      // If we don't have enough games with matching tags, get some popular games to fill the list
+      if (result.length < limit) {
+        const remainingLimit = limit - result.length;
+        const { data: popularGames, error: popularError } = await supabase
+          .from('games')
+          .select('*')
+          .neq('id', gameId)
+          .eq('status', 'published')
+          .not('id', 'in', result.map(g => g.id))
+          .order('visit_count', { ascending: false })
+          .limit(remainingLimit);
+        
+        if (!popularError && popularGames) {
+          result = [...result, ...popularGames];
+        }
       }
       
-      return data || [];
+      // If we still don't have enough games, get random games to reach the minimum limit
+      if (result.length < limit) {
+        const remainingLimit = limit - result.length;
+        const { data: randomGames, error: randomError } = await supabase
+          .from('games')
+          .select('*')
+          .neq('id', gameId)
+          .eq('status', 'published')
+          .not('id', 'in', result.map(g => g.id))
+          .order('created_at', { ascending: false }) // Different ordering to get different games
+          .limit(remainingLimit);
+        
+        if (!randomError && randomGames) {
+          result = [...result, ...randomGames];
+        }
+      }
+      
+      // If we STILL don't have enough games, try one more approach with a different ordering
+      if (result.length < limit) {
+        const remainingLimit = limit - result.length;
+        const { data: moreRandomGames, error: moreRandomError } = await supabase
+          .from('games')
+          .select('*')
+          .neq('id', gameId)
+          .eq('status', 'published')
+          .not('id', 'in', result.map(g => g.id))
+          .limit(remainingLimit);
+        
+        if (!moreRandomError && moreRandomGames) {
+          result = [...result, ...moreRandomGames];
+        }
+      }
+      
+      return result;
     } catch (error) {
       console.error('Error in getSimilarGames:', error);
       return [];

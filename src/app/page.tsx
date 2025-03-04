@@ -61,6 +61,7 @@ export default async function Home() {
   const topRatedGames = await gameService.getTopRatedGames(10);
   const newReleases = await gameService.getNewReleases(10);
   const mobileGames = await gameService.getMobileGames(10);
+  const trendingGames = await gameService.getTrendingGames(10);
   
   // Get featured game for the hero banner
   const featuredGames = await gameService.getFeaturedGames();
@@ -93,6 +94,10 @@ export default async function Home() {
   const formattedMobileGames = mobileGames.length > 0 ?
     formatGamesForCarousel(mobileGames) :
     fallbackGames;
+    
+  const formattedTrendingGames = trendingGames.length > 0 ?
+    formatGamesForCarousel(trendingGames) :
+    fallbackGames;
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -103,19 +108,25 @@ export default async function Home() {
         
         <div className="container mx-auto px-4 py-8">
           <GameCarousel 
-            title="Top Rated" 
+            title="🔥 Trending" 
+            games={formattedTrendingGames} 
+            viewAllLink="/games?category=trending"
+          />
+          
+          <GameCarousel 
+            title="💯 Top Rated" 
             games={formattedTopRatedGames} 
             viewAllLink="/games?category=top-rated"
           />
           
           <GameCarousel 
-            title="New Releases" 
+            title="🎁 New Releases" 
             games={formattedNewReleases} 
             viewAllLink="/games?category=new"
           />
           
           <GameCarousel 
-            title="Mobile Games" 
+            title="📱 Mobile Games" 
             games={formattedMobileGames} 
             viewAllLink="/games?category=mobile"
           />
