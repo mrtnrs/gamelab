@@ -283,7 +283,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
             <h1 className="text-4xl md:text-6xl font-bold mb-4">{game.title}</h1>
             
             <div className="flex items-center space-x-4 mb-4">
-              {game.rating_average > 0 && (
+              {game.rating_average !== undefined && game.rating_average > 0 && (
                 <div className="flex items-center space-x-1">
                   {[...Array(5)].map((_, i) => {
                     const starValue = i + 1;

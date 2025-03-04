@@ -61,10 +61,10 @@ export default function SearchPage() {
       const matchesRating = (game.rating_average || 0) >= minRating;
       
       // Mobile compatibility filter
-      const matchesMobile = !mobileOnly || game.is_mobile_compatible;
+      const matchesMobile = !mobileOnly || !!game.is_mobile_compatible;
       
       // Multiplayer filter
-      const matchesMultiplayer = !multiplayerOnly || game.is_multiplayer;
+      const matchesMultiplayer = !multiplayerOnly || !!game.is_multiplayer;
       
       return matchesSearch && matchesCategory && matchesRating && matchesMobile && matchesMultiplayer;
     })
@@ -230,19 +230,19 @@ export default function SearchPage() {
                           fill
                           className="object-cover"
                         />
-                        {game.rating_average > 0 && (
+                        {game.rating_average !== undefined && game.rating_average > 0 && (
                           <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded-full">
                             {game.rating_average.toFixed(1)}
                           </div>
                         )}
                         {/* Game type indicators */}
                         <div className="absolute bottom-2 left-2 flex space-x-1">
-                          {game.is_mobile_compatible && (
+                          {game.is_mobile_compatible === true && (
                             <div className="bg-black/70 text-white text-xs p-1 rounded-full">
                               <FiSmartphone size={14} />
                             </div>
                           )}
-                          {game.is_multiplayer && (
+                          {game.is_multiplayer === true && (
                             <div className="bg-black/70 text-white text-xs p-1 rounded-full">
                               <FiUsers size={14} />
                             </div>
