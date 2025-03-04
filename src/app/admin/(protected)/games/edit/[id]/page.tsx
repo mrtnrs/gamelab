@@ -8,7 +8,7 @@ type Props = {
   params: Promise<{ id: string }>; // Correct typing for dynamic routes
 };
 
-
+export const runtime = 'edge';
 // Removed edge runtime directive to fix Cloudflare deployment issues
 
 // Async Server Component
