@@ -7,7 +7,8 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
-export const dynamicParams = false;
+// export const dynamicParams = false;
+export const runtime = 'edge';
 
 // Async Server Component
 export default async function GamePlayPage({ params }: Props) {
