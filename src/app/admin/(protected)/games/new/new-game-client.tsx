@@ -7,7 +7,7 @@ export default function NewGameClient() {
   return (
     <AdminRouteGuard>
       <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
-        {/* <GameForm /> */}
+        <GameForm />
       </div>
     </AdminRouteGuard>
   )
