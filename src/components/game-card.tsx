@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
+import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa'
 import { useBookmarks } from '@/contexts/bookmark-context'
 
 interface GameCardProps {
@@ -26,7 +27,7 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
   
   return (
     <div className="group relative rounded-md overflow-hidden transition-all duration-300">
-      <div className="aspect-video relative overflow-hidden rounded-md">
+      <div className="aspect-[2/3] relative overflow-hidden rounded-md">
         <Image
           src={image}
           alt={title}
@@ -36,14 +37,23 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
         />
         
         {year && (
-          <span className="absolute bottom-2 left-2 bg-background/80 text-xs px-2 py-1 rounded">
+          <span className="absolute bottom-2 left-2 text-xs px-2 py-1 rounded text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
             {year}
           </span>
         )}
         
         {rating && (
-          <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded-full">
-            {rating}
+          <div className="absolute top-2 right-2 flex items-center space-x-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+            {[...Array(5)].map((_, i) => {
+              const starValue = i + 1;
+              if (starValue <= rating) {
+                return <FaStar key={i} className="text-yellow-400 w-3 h-3" />;
+              } else if (starValue - 0.5 <= rating) {
+                return <FaStarHalfAlt key={i} className="text-yellow-400 w-3 h-3" />;
+              } else {
+                return <FaRegStar key={i} className="text-yellow-400 w-3 h-3" />;
+              }
+            })}
           </div>
         )}
       </div>

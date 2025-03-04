@@ -1,142 +1,13 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import GameCard from '@/components/game-card'
 import { FiFilter, FiChevronDown, FiGrid, FiList } from 'react-icons/fi'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
-
-// Mock data for games
-interface GameItem {
-  id: string;
-  title: string;
-  slug: string;
-  image: string;
-  category: string;
-  rating: number;
-  year: string;
-}
-
-const MOCK_GAMES: GameItem[] = [
-  {
-    id: '1',
-    title: 'Cosmic Odyssey',
-    slug: 'cosmic-odyssey',
-    image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070',
-    category: 'adventure',
-    rating: 4.8,
-    year: '2025',
-  },
-  {
-    id: '2',
-    title: 'Neon Drift',
-    slug: 'neon-drift',
-    image: 'https://images.unsplash.com/photo-1551103782-8ab07afd45c1?q=80&w=2070',
-    category: 'racing',
-    rating: 4.5,
-    year: '2025',
-  },
-  {
-    id: '3',
-    title: 'Quantum Tactics',
-    slug: 'quantum-tactics',
-    image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=2070',
-    category: 'strategy',
-    rating: 4.7,
-    year: '2024',
-  },
-  {
-    id: '4',
-    title: 'Mystic Realms',
-    slug: 'mystic-realms',
-    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070',
-    category: 'rpg',
-    rating: 4.9,
-    year: '2024',
-  },
-  {
-    id: '5',
-    title: 'Cyber Infiltrator',
-    slug: 'cyber-infiltrator',
-    image: 'https://images.unsplash.com/photo-1550439062-609e1531270e?q=80&w=2070',
-    category: 'action',
-    rating: 4.6,
-    year: '2024',
-  },
-  {
-    id: '6',
-    title: 'Puzzle Dimensions',
-    slug: 'puzzle-dimensions',
-    image: 'https://images.unsplash.com/photo-1553481187-be93c21490a9?q=80&w=2070',
-    category: 'puzzle',
-    rating: 4.3,
-    year: '2024',
-  },
-  {
-    id: '7',
-    title: 'Stellar Command',
-    slug: 'stellar-command',
-    image: 'https://images.unsplash.com/photo-1548484352-ea579e5233a8?q=80&w=2070',
-    category: 'strategy',
-    rating: 4.7,
-    year: '2023',
-  },
-  {
-    id: '8',
-    title: 'Velocity Rush',
-    slug: 'velocity-rush',
-    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=2070',
-    category: 'racing',
-    rating: 4.4,
-    year: '2023',
-  },
-  {
-    id: '9',
-    title: 'Arcane Legacy',
-    slug: 'arcane-legacy',
-    image: 'https://images.unsplash.com/photo-1511882150382-421056c89033?q=80&w=2070',
-    category: 'rpg',
-    rating: 4.8,
-    year: '2023',
-  },
-  {
-    id: '10',
-    title: 'Shadow Protocol',
-    slug: 'shadow-protocol',
-    image: 'https://images.unsplash.com/photo-1547394765-185e1e68f34e?q=80&w=2070',
-    category: 'action',
-    rating: 4.5,
-    year: '2023',
-  },
-  {
-    id: '11',
-    title: 'Logic Labyrinth',
-    slug: 'logic-labyrinth',
-    image: 'https://images.unsplash.com/photo-1553481187-be93c21490a9?q=80&w=2070',
-    category: 'puzzle',
-    rating: 4.2,
-    year: '2023',
-  },
-  {
-    id: '12',
-    title: 'Galactic Pioneers',
-    slug: 'galactic-pioneers',
-    image: 'https://images.unsplash.com/photo-1536152470836-b943b246224c?q=80&w=2070',
-    category: 'adventure',
-    rating: 4.6,
-    year: '2022',
-  },
-];
-
-const CATEGORIES = [
-  { id: 'all', name: 'All Categories' },
-  { id: 'action', name: 'Action' },
-  { id: 'adventure', name: 'Adventure' },
-  { id: 'puzzle', name: 'Puzzle' },
-  { id: 'racing', name: 'Racing' },
-  { id: 'rpg', name: 'RPG' },
-  { id: 'strategy', name: 'Strategy' },
-];
+import { gameService } from '@/services/game-service'
+import { Game } from '@/types/game'
 
 const SORT_OPTIONS = [
   { id: 'newest', name: 'Newest First' },
@@ -146,46 +17,101 @@ const SORT_OPTIONS = [
 ];
 
 export default function GamesPage() {
-  const [games, setGames] = useState<GameItem[]>(MOCK_GAMES)
-  const [visibleGames, setVisibleGames] = useState<GameItem[]>([])
-  const [category, setCategory] = useState('all')
+  const searchParams = useSearchParams();
+  const categorySlug = searchParams.get('category');
+  
+  const [games, setGames] = useState<Game[]>([])
+  const [visibleGames, setVisibleGames] = useState<Game[]>([])
+  const [categories, setCategories] = useState<{id: string, name: string, slug: string}[]>([])
+  const [selectedCategory, setSelectedCategory] = useState(categorySlug || 'all')
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
+  const [mobileOnly, setMobileOnly] = useState(false)
+  const [multiplayerOnly, setMultiplayerOnly] = useState(false)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
-  const gamesPerPage = 6
+  const gamesPerPage = 8
   
-  // Filter and sort games
+  // Fetch categories
   useEffect(() => {
-    let filteredGames = [...MOCK_GAMES]
-    
-    // Apply category filter
-    if (category !== 'all') {
-      filteredGames = filteredGames.filter(game => game.category === category)
-    }
-    
-    // Apply sorting
-    filteredGames.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return parseInt(b.year) - parseInt(a.year)
-        case 'oldest':
-          return parseInt(a.year) - parseInt(b.year)
-        case 'rating':
-          return b.rating - a.rating
-        case 'title':
-          return a.title.localeCompare(b.title)
-        default:
-          return 0
+    const fetchCategories = async () => {
+      try {
+        const categoriesData = await gameService.getCategories();
+        
+        // Format categories for the dropdown
+        const formattedCategories = [
+          { id: 'all', name: 'All Categories', slug: 'all' },
+          ...categoriesData.map((cat: any) => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug
+          }))
+        ];
+        
+        setCategories(formattedCategories);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
       }
-    })
+    };
     
-    setGames(filteredGames)
-    setPage(1)
-    setVisibleGames(filteredGames.slice(0, gamesPerPage))
-    setHasMore(filteredGames.length > gamesPerPage)
-  }, [category, sortBy])
+    fetchCategories();
+  }, []);
+  
+  // Fetch games based on category and filters
+  useEffect(() => {
+    const fetchGames = async () => {
+      setLoading(true);
+      try {
+        let gamesData;
+        let categoryId;
+        
+        // Get category ID if a specific category is selected
+        if (selectedCategory !== 'all') {
+          const category = await gameService.getCategoryBySlug(selectedCategory);
+          categoryId = category?.id;
+        }
+        
+        // Use the optimized filtered query
+        gamesData = await gameService.getFilteredGames({
+          categoryId: categoryId,
+          mobileOnly: mobileOnly,
+          multiplayerOnly: multiplayerOnly
+        });
+        
+        setGames(gamesData);
+        
+        // Apply sorting
+        const sortedGames = [...gamesData].sort((a, b) => {
+          switch (sortBy) {
+            case 'newest':
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            case 'oldest':
+              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            case 'rating':
+              return (b.rating_average || 0) - (a.rating_average || 0);
+            case 'title':
+              return a.title.localeCompare(b.title);
+            default:
+              return 0;
+          }
+        });
+        
+        setGames(sortedGames);
+        setPage(1);
+        setVisibleGames(sortedGames.slice(0, gamesPerPage));
+        setHasMore(sortedGames.length > gamesPerPage);
+      } catch (error) {
+        console.error('Error fetching games:', error);
+      } finally {
+        setLoading(false);
+        setInitialLoading(false);
+      }
+    };
+    
+    fetchGames();
+  }, [selectedCategory, sortBy, mobileOnly, multiplayerOnly])
   
   // Load more games when scrolling
   const loadMoreGames = () => {
@@ -243,12 +169,12 @@ export default function GamesPage() {
           {/* Category Filter */}
           <div className="relative">
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
               className="appearance-none bg-card border border-border rounded-md px-4 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {CATEGORIES.map((cat) => (
-                <option key={cat.id} value={cat.id}>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.slug}>
                   {cat.name}
                 </option>
               ))}
@@ -271,6 +197,34 @@ export default function GamesPage() {
             </select>
             <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/70" />
           </div>
+          
+          {/* Mobile Filter */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="mobileOnly"
+              checked={mobileOnly}
+              onChange={(e) => setMobileOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="mobileOnly" className="text-sm">
+              Mobile Games Only
+            </label>
+          </div>
+          
+          {/* Multiplayer Filter */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="multiplayerOnly"
+              checked={multiplayerOnly}
+              onChange={(e) => setMultiplayerOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="multiplayerOnly" className="text-sm">
+              Multiplayer Only
+            </label>
+          </div>
         </div>
         
         {/* View Mode Toggle */}
@@ -291,17 +245,21 @@ export default function GamesPage() {
       </div>
       
       {/* Games Grid */}
-      {viewMode === 'grid' ? (
+      {initialLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-pulse">Loading games...</div>
+        </div>
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {visibleGames.map((game) => (
             <GameCard
               key={game.id}
               id={game.id}
               title={game.title}
-              slug={game.slug}
-              image={game.image}
-              rating={game.rating}
-              year={game.year}
+              slug={game.title.toLowerCase().replace(/\s+/g, '-')}
+              image={game.image_url}
+              rating={game.rating_average}
+              year={new Date(game.created_at).getFullYear().toString()}
             />
           ))}
         </div>
@@ -311,7 +269,7 @@ export default function GamesPage() {
             <div key={game.id} className="flex bg-card border border-border rounded-md overflow-hidden">
               <div className="w-1/4 aspect-video relative">
                 <img
-                  src={game.image}
+                  src={game.image_url}
                   alt={game.title}
                   className="object-cover w-full h-full"
                 />
@@ -319,13 +277,13 @@ export default function GamesPage() {
               <div className="p-4 flex-1">
                 <h3 className="text-lg font-semibold mb-2">{game.title}</h3>
                 <div className="flex items-center text-sm text-foreground/70 mb-2">
-                  <span className="capitalize">{game.category}</span>
+                  <span className="capitalize">{game.developer}</span>
                   <span className="mx-2">•</span>
-                  <span>{game.year}</span>
+                  <span>{new Date(game.created_at).getFullYear()}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="bg-primary text-white text-xs px-2 py-1 rounded-full">
-                    {game.rating}
+                    {game.rating_average ? game.rating_average.toFixed(1) : 'N/A'}
                   </div>
                 </div>
               </div>

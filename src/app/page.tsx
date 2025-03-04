@@ -60,21 +60,25 @@ export default async function Home() {
   // Fetch games from Supabase
   const topRatedGames = await gameService.getTopRatedGames(10);
   const newReleases = await gameService.getNewReleases(10);
+  const mobileGames = await gameService.getMobileGames(10);
   
-  // Get the most visited game for the hero banner
-  const mostVisitedGames = await gameService.getTopRatedGames(1);
+  // Get featured game for the hero banner
+  const featuredGames = await gameService.getFeaturedGames();
   
-  // Use the most visited game for the hero banner or fallback
-  const featuredGame = mostVisitedGames.length > 0 ? {
-    id: mostVisitedGames[0].id,
-    title: mostVisitedGames[0].title,
-    description: mostVisitedGames[0].description,
-    slug: mostVisitedGames[0].title.toLowerCase().replace(/\s+/g, '-'),
-    image: mostVisitedGames[0].image_url,
-    year: new Date(mostVisitedGames[0].created_at).getFullYear().toString(),
-    rating: mostVisitedGames[0].rating_average ? 
-      `${Math.round(mostVisitedGames[0].rating_average * 10) / 10}/5` : 
-      "Not rated"
+  // Use the featured game for the hero banner or fallback
+  const featuredGame = featuredGames.length > 0 ? {
+    id: featuredGames[0].id,
+    title: featuredGames[0].title,
+    description: featuredGames[0].description,
+    slug: featuredGames[0].title.toLowerCase().replace(/\s+/g, '-'),
+    image: featuredGames[0].image_url,
+    year: new Date(featuredGames[0].created_at).getFullYear().toString(),
+    rating: featuredGames[0].rating_average ? 
+      `${Math.round(featuredGames[0].rating_average * 10) / 10}/5` : 
+      "Not rated",
+    rating_average: featuredGames[0].rating_average ? 
+      Math.round(featuredGames[0].rating_average * 10) / 10 : 
+      undefined
   } : fallbackFeaturedGame;
   
   // Format games for carousel or use fallbacks if empty
@@ -84,6 +88,10 @@ export default async function Home() {
     
   const formattedNewReleases = newReleases.length > 0 ? 
     formatGamesForCarousel(newReleases) : 
+    fallbackGames;
+    
+  const formattedMobileGames = mobileGames.length > 0 ?
+    formatGamesForCarousel(mobileGames) :
     fallbackGames;
   
   return (
@@ -104,6 +112,12 @@ export default async function Home() {
             title="New Releases" 
             games={formattedNewReleases} 
             viewAllLink="/games?category=new"
+          />
+          
+          <GameCarousel 
+            title="Mobile Games" 
+            games={formattedMobileGames} 
+            viewAllLink="/games?category=mobile"
           />
           
           <BookmarkedGamesSection />

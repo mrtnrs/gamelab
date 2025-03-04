@@ -18,9 +18,10 @@ interface GameCarouselProps {
   title: string
   games: Game[]
   viewAllLink?: string
+  loading?: boolean
 }
 
-export default function GameCarousel({ title, games, viewAllLink }: GameCarouselProps) {
+export default function GameCarousel({ title, games, viewAllLink, loading = false }: GameCarouselProps) {
   const carouselRef = useRef<HTMLDivElement>(null)
   const [showLeftButton, setShowLeftButton] = useState(false)
   const [showRightButton, setShowRightButton] = useState(true)
@@ -77,11 +78,30 @@ export default function GameCarousel({ title, games, viewAllLink }: GameCarousel
           className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
           onScroll={handleScroll}
         >
-          {games.map((game) => (
-            <div key={game.id} className="flex-shrink-0 w-[250px]">
-              <GameCard {...game} />
+          {loading ? (
+            // Loading skeleton
+            Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="flex-shrink-0 w-[250px]">
+                <div className="rounded-lg overflow-hidden shadow-md bg-card">
+                  <div className="aspect-[2/3] bg-muted animate-pulse" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+                    <div className="h-3 bg-muted animate-pulse rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : games.length > 0 ? (
+            games.map((game) => (
+              <div key={game.id} className="flex-shrink-0 w-[250px]">
+                <GameCard {...game} />
+              </div>
+            ))
+          ) : (
+            <div className="py-8 text-center text-muted-foreground w-full">
+              No games found
             </div>
-          ))}
+          )}
         </div>
         
         {showRightButton && (

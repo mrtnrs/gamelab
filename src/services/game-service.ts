@@ -1,6 +1,15 @@
 import { supabase } from '@/utils/supabase';
 import { Game, GameFormData } from '@/types/game';
 
+// Comment type definition
+export interface GameComment {
+  id: string;
+  game_id: string;
+  comment_text: string;
+  created_at: string;
+  user_id?: string;
+}
+
 export const gameService = {
   async getGames(): Promise<Game[]> {
     try {
@@ -42,17 +51,30 @@ export const gameService = {
     }
   },
   
-  async getGamesByCategory(category: string): Promise<Game[]> {
+  async getGamesByCategory(categorySlug: string): Promise<Game[]> {
     try {
+      // First get the category ID from the slug
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', categorySlug)
+        .single();
+      
+      if (categoryError || !categoryData) {
+        console.error(`Error fetching category with slug ${categorySlug}:`, categoryError);
+        return [];
+      }
+      
+      // Then get games with that category ID
       const { data, error } = await supabase
         .from('games')
         .select('*')
-        .eq('category', category)
+        .eq('category_id', categoryData.id)
         .eq('status', 'published')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error(`Error fetching games by category ${category}:`, error);
+        console.error(`Error fetching games by category ${categorySlug}:`, error);
         return [];
       }
       
@@ -205,7 +227,9 @@ export const gameService = {
         .from('games')
         .select('*')
         .eq('status', 'published')
-        .order('visit_count', { ascending: false })
+        .gt('rating_average', 0) // Only games with ratings > 0
+        .gt('rating_count', 0)  // Only games with at least one rating
+        .order('rating_average', { ascending: false })
         .limit(limit);
       
       if (error) {
@@ -226,7 +250,7 @@ export const gameService = {
         .from('games')
         .select('*')
         .eq('status', 'published')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) // Sort by created_at to get newest games
         .limit(limit);
       
       if (error) {
@@ -237,6 +261,94 @@ export const gameService = {
       return data || [];
     } catch (error) {
       console.error('Error in getNewReleases:', error);
+      return [];
+    }
+  },
+
+  async getMobileGames(limit: number = 10): Promise<Game[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published')
+        .eq('is_mobile_compatible', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching mobile games:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getMobileGames:', error);
+      return [];
+    }
+  },
+  
+  async getMultiplayerGames(limit: number = 10): Promise<Game[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published')
+        .eq('is_multiplayer', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching multiplayer games:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getMultiplayerGames:', error);
+      return [];
+    }
+  },
+  
+  async getFilteredGames(options: { 
+    categoryId?: string, 
+    mobileOnly?: boolean, 
+    multiplayerOnly?: boolean,
+    limit?: number
+  }): Promise<Game[]> {
+    try {
+      let query = supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published');
+      
+      if (options.categoryId && options.categoryId !== 'all') {
+        query = query.eq('category_id', options.categoryId);
+      }
+      
+      if (options.mobileOnly) {
+        query = query.eq('is_mobile_compatible', true);
+      }
+      
+      if (options.multiplayerOnly) {
+        query = query.eq('is_multiplayer', true);
+      }
+      
+      query = query.order('created_at', { ascending: false });
+      
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching filtered games:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFilteredGames:', error);
       return [];
     }
   },
@@ -307,24 +419,39 @@ export const gameService = {
     }
   },
   
-  async getCategories(): Promise<string[]> {
+  async getCategories(): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from('games')
-        .select('category')
-        .eq('status', 'published');
+      const { data, error } = await supabase.rpc('get_categories_with_counts');
       
       if (error) {
-        console.error('Error fetching categories:', error);
+        console.error('Error fetching categories with counts:', error);
         return [];
       }
       
-      // Extract unique categories
-      const categories = [...new Set(data?.map(game => game.category))];
-      return categories.filter(Boolean) as string[];
+      return data || [];
     } catch (error) {
       console.error('Error in getCategories:', error);
       return [];
+    }
+  },
+  
+  async getCategoryBySlug(slug: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+      
+      if (error) {
+        console.error(`Error fetching category with slug ${slug}:`, error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getCategoryBySlug:', error);
+      return null;
     }
   },
   
@@ -383,5 +510,111 @@ export const gameService = {
       console.error('Error in uploadGalleryImages:', error);
       return { success: false, error };
     }
-  }
+  },
+  
+  async addComment(gameId: string, commentText: string): Promise<{ success: boolean; commentId?: string; error?: any }> {
+    try {
+      const { data, error } = await supabase.rpc('add_game_comment', {
+        p_game_id: gameId,
+        p_comment_text: commentText
+      });
+      
+      if (error) {
+        console.error(`Error adding comment to game ${gameId}:`, error);
+        return { success: false, error: error.message };
+      }
+      
+      if (!data.success) {
+        return { success: false, error: data.error };
+      }
+      
+      return { success: true, commentId: data.comment_id };
+    } catch (error) {
+      console.error('Error in addComment:', error);
+      return { success: false, error };
+    }
+  },
+  
+  async getComments(gameId: string): Promise<GameComment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('game_comments')
+        .select('*')
+        .eq('game_id', gameId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error(`Error fetching comments for game ${gameId}:`, error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getComments:', error);
+      return [];
+    }
+  },
+  
+  async getSimilarGames(gameId: string, tags: string[], limit: number = 5): Promise<Game[]> {
+    try {
+      // First try to find games with matching tags
+      if (tags && tags.length > 0) {
+        const { data, error } = await supabase
+          .from('games')
+          .select('*')
+          .neq('id', gameId) // Exclude current game
+          .eq('status', 'published')
+          .overlaps('tags', tags) // Find games with at least one matching tag
+          .order('rating_average', { ascending: false })
+          .limit(limit);
+        
+        if (error) {
+          console.error(`Error fetching similar games for game ${gameId}:`, error);
+          return [];
+        }
+        
+        if (data && data.length >= limit) {
+          return data;
+        }
+        
+        // If we didn't get enough games with matching tags, get some popular games to fill the list
+        const remainingLimit = limit - (data?.length || 0);
+        if (remainingLimit > 0) {
+          const { data: popularGames, error: popularError } = await supabase
+            .from('games')
+            .select('*')
+            .neq('id', gameId)
+            .eq('status', 'published')
+            .not('id', 'in', data?.map(g => g.id) || [])
+            .order('visit_count', { ascending: false })
+            .limit(remainingLimit);
+          
+          if (!popularError && popularGames) {
+            return [...(data || []), ...popularGames];
+          }
+        }
+        
+        return data || [];
+      }
+      
+      // If no tags, just get popular games
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .neq('id', gameId)
+        .eq('status', 'published')
+        .order('visit_count', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error(`Error fetching popular games for game ${gameId}:`, error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getSimilarGames:', error);
+      return [];
+    }
+  },
 };

@@ -18,7 +18,12 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "GameLab - AI Created Games",
-  description: "Discover AI-created games in a beautiful Netflix-like interface",
+  description: "Discover AI-vibe-coded games for immersive multiplayer fun",
+  icons: {
+    icon: "/gamepad.svg",
+    shortcut: "/gamepad.svg",
+    apple: "/gamepad.svg",
+  },
 };
 
 export const runtime = "nodejs";

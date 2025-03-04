@@ -5,115 +5,45 @@ import GameCard from '@/components/game-card'
 import { FiTrendingUp, FiStar, FiCalendar } from 'react-icons/fi'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
-
-// Mock data for games
-const MOCK_GAMES = [
-  {
-    id: '1',
-    title: 'Cosmic Odyssey',
-    slug: 'cosmic-odyssey',
-    image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070',
-    category: 'adventure',
-    rating: 4.8,
-    year: '2025',
-    trending: true,
-    featured: true,
-  },
-  {
-    id: '2',
-    title: 'Neon Drift',
-    slug: 'neon-drift',
-    image: 'https://images.unsplash.com/photo-1551103782-8ab07afd45c1?q=80&w=2070',
-    category: 'racing',
-    rating: 4.5,
-    year: '2025',
-    trending: true,
-    featured: false,
-  },
-  {
-    id: '3',
-    title: 'Quantum Tactics',
-    slug: 'quantum-tactics',
-    image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=2070',
-    category: 'strategy',
-    rating: 4.7,
-    year: '2024',
-    trending: true,
-    featured: false,
-  },
-  {
-    id: '4',
-    title: 'Mystic Realms',
-    slug: 'mystic-realms',
-    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070',
-    category: 'rpg',
-    rating: 4.9,
-    year: '2024',
-    trending: false,
-    featured: true,
-  },
-  {
-    id: '5',
-    title: 'Cyber Infiltrator',
-    slug: 'cyber-infiltrator',
-    image: 'https://images.unsplash.com/photo-1550439062-609e1531270e?q=80&w=2070',
-    category: 'action',
-    rating: 4.6,
-    year: '2024',
-    trending: true,
-    featured: false,
-  },
-  {
-    id: '6',
-    title: 'Puzzle Dimensions',
-    slug: 'puzzle-dimensions',
-    image: 'https://images.unsplash.com/photo-1553481187-be93c21490a9?q=80&w=2070',
-    category: 'puzzle',
-    rating: 4.3,
-    year: '2024',
-    trending: false,
-    featured: true,
-  },
-  {
-    id: '7',
-    title: 'Stellar Command',
-    slug: 'stellar-command',
-    image: 'https://images.unsplash.com/photo-1548484352-ea579e5233a8?q=80&w=2070',
-    category: 'strategy',
-    rating: 4.7,
-    year: '2023',
-    trending: false,
-    featured: true,
-  },
-  {
-    id: '8',
-    title: 'Velocity Rush',
-    slug: 'velocity-rush',
-    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=2070',
-    category: 'racing',
-    rating: 4.4,
-    year: '2023',
-    trending: true,
-    featured: false,
-  },
-];
+import { gameService } from '@/services/game-service'
+import { Game } from '@/types/game'
 
 export default function NewAndPopularPage() {
   const [activeTab, setActiveTab] = useState('trending')
+  const [games, setGames] = useState<Game[]>([])
+  const [loading, setLoading] = useState(true)
   
-  // Get games based on active tab
-  const getFilteredGames = () => {
-    switch (activeTab) {
-      case 'trending':
-        return MOCK_GAMES.filter(game => game.trending)
-      case 'featured':
-        return MOCK_GAMES.filter(game => game.featured)
-      case 'new':
-        return MOCK_GAMES.sort((a, b) => parseInt(b.year) - parseInt(a.year)).slice(0, 6)
-      default:
-        return []
+  // Fetch games based on active tab
+  useEffect(() => {
+    const fetchGames = async () => {
+      setLoading(true)
+      try {
+        let data: Game[] = []
+        
+        switch (activeTab) {
+          case 'trending':
+            data = await gameService.getTrendingGames(10)
+            break
+          case 'featured':
+            data = await gameService.getFeaturedGames()
+            break
+          case 'new':
+            data = await gameService.getNewReleases(10)
+            break
+          default:
+            data = []
+        }
+        
+        setGames(data)
+      } catch (error) {
+        console.error(`Error fetching ${activeTab} games:`, error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    
+    fetchGames()
+  }, [activeTab])
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -165,22 +95,28 @@ export default function NewAndPopularPage() {
       </div>
       
       {/* Games Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {getFilteredGames().map((game) => (
-          <GameCard
-            key={game.id}
-            id={game.id}
-            title={game.title}
-            slug={game.slug}
-            image={game.image}
-            rating={game.rating}
-            year={game.year}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-pulse">Loading games...</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {games.map((game) => (
+            <GameCard
+              key={game.id}
+              id={game.id}
+              title={game.title}
+              slug={game.title.toLowerCase().replace(/\s+/g, '-')}
+              image={game.image_url}
+              rating={game.rating_average}
+              year={new Date(game.created_at).getFullYear().toString()}
+            />
+          ))}
+        </div>
+      )}
       
       {/* No Results */}
-      {getFilteredGames().length === 0 && (
+      {!loading && games.length === 0 && (
         <div className="text-center py-12">
           <h3 className="text-xl font-semibold mb-2">No games found</h3>
           <p className="text-foreground/70">Check back later for new games</p>

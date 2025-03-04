@@ -11,20 +11,14 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4">GameLab</h3>
             <p className="text-muted-foreground">
-              Discover AI-created games in a beautiful Netflix-like interface.
+              Discover AI-vibe-coded games for immersive multiplayer fun.
             </p>
             <div className="flex space-x-4 mt-4">
-              <a href="#" className="text-foreground/70 hover:text-primary transition-colors">
-                <FiGithub className="h-5 w-5" />
-              </a>
               <a href="#" className="text-foreground/70 hover:text-primary transition-colors">
                 <FiTwitter className="h-5 w-5" />
               </a>
               <a href="#" className="text-foreground/70 hover:text-primary transition-colors">
                 <FiInstagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-foreground/70 hover:text-primary transition-colors">
-                <FiYoutube className="h-5 w-5" />
               </a>
             </div>
           </div>
@@ -80,10 +74,10 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Contact</h3>
             <ul className="space-y-2">
               <li className="text-muted-foreground">
-                Email: contact@gamelab.com
+                Email: contact@gamelab.fun
               </li>
               <li className="text-muted-foreground">
-                Support: support@gamelab.com
+                Support: support@gamelab.fun
               </li>
             </ul>
           </div>

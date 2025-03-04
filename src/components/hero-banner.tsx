@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { FiPlay } from 'react-icons/fi'
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
+import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa'
 import { useBookmarks } from '@/contexts/bookmark-context'
 
 interface HeroBannerProps {
@@ -14,6 +15,7 @@ interface HeroBannerProps {
   id: string
   year?: string
   rating?: string
+  rating_average?: number
 }
 
 export default function HeroBanner({ 
@@ -23,7 +25,8 @@ export default function HeroBanner({
   image, 
   id,
   year, 
-  rating 
+  rating,
+  rating_average
 }: HeroBannerProps) {
   const { isBookmarked, toggleBookmark } = useBookmarks()
   const bookmarked = isBookmarked(id)
@@ -42,25 +45,31 @@ export default function HeroBanner({
           priority
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/80 via-white/50 to-transparent dark:from-black/70 dark:via-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-white/80 via-white/50 to-transparent dark:from-black/70 dark:via-black/40" />
       </div>
       
       <div className="relative h-full container mx-auto px-4 flex flex-col justify-end pb-24">
         <div className="max-w-2xl">
-          <div className="flex items-center mb-2">
-            <span className="bg-red-600 text-white px-2 py-0.5 text-xs font-bold tracking-wider">
-              FEATURED
-            </span>
-          </div>
+          {/* Featured tag removed */}
           
           <h1 className="text-4xl md:text-6xl font-bold mb-4">{title}</h1>
           
           <div className="flex items-center space-x-4 mb-4">
-            {rating && (
-              <span className="text-sm bg-primary text-white px-2 py-1 rounded">
-                {rating}
-              </span>
+            {rating_average && rating_average > 0 && (
+              <div className="flex items-center space-x-1">
+                {[...Array(5)].map((_, i) => {
+                  const starValue = i + 1;
+                  if (starValue <= rating_average) {
+                    return <FaStar key={i} className="text-yellow-400 w-4 h-4" />;
+                  } else if (starValue - 0.5 <= rating_average) {
+                    return <FaStarHalfAlt key={i} className="text-yellow-400 w-4 h-4" />;
+                  } else {
+                    return <FaRegStar key={i} className="text-yellow-400 w-4 h-4" />;
+                  }
+                })}
+                <span className="text-sm text-white ml-1">{rating_average.toFixed(1)}</span>
+              </div>
             )}
             {year && (
               <span className="text-sm">{year}</span>

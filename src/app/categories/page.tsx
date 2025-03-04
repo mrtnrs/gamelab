@@ -1,102 +1,42 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
 import { FiSearch } from 'react-icons/fi'
+import { gameService } from '@/services/game-service'
 
-// Mock categories data
-const categories = [
-  {
-    id: "1",
-    name: "Action",
-    slug: "action",
-    image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070",
-    count: 42
-  },
-  {
-    id: "2",
-    name: "Adventure",
-    slug: "adventure",
-    image: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=2070",
-    count: 38
-  },
-  {
-    id: "3",
-    name: "RPG",
-    slug: "rpg",
-    image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=2071",
-    count: 27
-  },
-  {
-    id: "4",
-    name: "Strategy",
-    slug: "strategy",
-    image: "https://images.unsplash.com/photo-1536104968055-4d61aa56f46a?q=80&w=2080",
-    count: 19
-  },
-  {
-    id: "5",
-    name: "Simulation",
-    slug: "simulation",
-    image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=2059",
-    count: 24
-  },
-  {
-    id: "6",
-    name: "Sports",
-    slug: "sports",
-    image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?q=80&w=2070",
-    count: 16
-  },
-  {
-    id: "7",
-    name: "Racing",
-    slug: "racing",
-    image: "https://images.unsplash.com/photo-1559163499-413811fb2344?q=80&w=2070",
-    count: 12
-  },
-  {
-    id: "8",
-    name: "Puzzle",
-    slug: "puzzle",
-    image: "https://images.unsplash.com/photo-1547638375-ebf04735d792?q=80&w=2013",
-    count: 31
-  },
-  {
-    id: "9",
-    name: "Horror",
-    slug: "horror",
-    image: "https://images.unsplash.com/photo-1608889175638-9322300c46e8?q=80&w=2080",
-    count: 18
-  },
-  {
-    id: "10",
-    name: "Platformer",
-    slug: "platformer",
-    image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=2025",
-    count: 22
-  },
-  {
-    id: "11",
-    name: "Shooter",
-    slug: "shooter",
-    image: "https://images.unsplash.com/photo-1543536448-d209d2d13a1c?q=80&w=2070",
-    count: 29
-  },
-  {
-    id: "12",
-    name: "Fighting",
-    slug: "fighting",
-    image: "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=2070",
-    count: 14
-  },
-];
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image: string;
+  description?: string;
+  count: number;
+}
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        const data = await gameService.getCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
   
   const filteredCategories = categories.filter(category => 
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -123,34 +63,42 @@ export default function CategoriesPage() {
             />
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredCategories.map((category) => (
-              <Link 
-                key={category.id}
-                href={`/games?category=${category.slug}`}
-                className="group relative rounded-lg overflow-hidden"
-              >
-                <div className="aspect-video relative">
-                  <Image
-                    src={category.image}
-                    alt={category.name}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-black/50 group-hover:bg-black/70 transition-colors" />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                    <h2 className="text-white text-xl font-semibold mb-2">{category.name}</h2>
-                    <p className="text-white/80 text-sm">{category.count} games</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          
-          {filteredCategories.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No categories found matching your search.</p>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-pulse">Loading categories...</div>
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {filteredCategories.map((category) => (
+                  <Link 
+                    key={category.id}
+                    href={`/games?category=${category.slug}`}
+                    className="group relative rounded-lg overflow-hidden"
+                  >
+                    <div className="aspect-video relative">
+                      <Image
+                        src={category.image || '/placeholder-category.jpg'}
+                        alt={category.name}
+                        fill
+                        className="object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-black/50 group-hover:bg-black/70 transition-colors" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                        <h2 className="text-white text-xl font-semibold mb-2">{category.name}</h2>
+                        <p className="text-white/80 text-sm">{category.count} games</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              
+              {filteredCategories.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No categories found matching your search.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
