@@ -1,16 +1,15 @@
 import Header from '@/components/header';
 import Footer from '@/components/footer';
 import GamePlayClient from './game-play-client';
+import { supabase } from '@/utils/supabase';
 
-// Define Props with params as a Promise
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// export const dynamicParams = false;
-export const runtime = 'edge';
+// export const runtime = 'edge';
+export const dynamicParams = false; // Only pre-rendered slugs
 
-// Async Server Component
 export default async function GamePlayPage({ params }: Props) {
   const { slug } = await params; // Await the Promise to get the slug
 
@@ -23,4 +22,28 @@ export default async function GamePlayPage({ params }: Props) {
       <Footer />
     </div>
   );
+}
+
+// Reuse the same static paths as the game detail page
+export async function generateStaticParams() {
+  try {
+    // Fetch all published games from Supabase
+    const { data: games, error } = await supabase
+      .from('games')
+      .select('title')
+      .eq('status', 'published');
+    
+    if (error) {
+      console.error('Error fetching games for static paths:', error);
+      return [];
+    }
+    
+    // Convert titles to slugs and return the params objects
+    return games.map(game => ({
+      slug: game.title.toLowerCase().replace(/\s+/g, '-')
+    }));
+  } catch (error) {
+    console.error('Error in generateStaticParams:', error);
+    return [];
+  }
 }

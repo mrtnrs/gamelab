@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   description: "Discover AI-created games in a beautiful Netflix-like interface",
 };
 
-// export const runtime = "nodejs";
-// export const dynamic = "force-static";
+export const runtime = "nodejs";
+export const dynamic = "force-static";
 
 export default function RootLayout({
   children,
