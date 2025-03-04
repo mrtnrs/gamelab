@@ -1,7 +1,6 @@
 import Header from '@/components/header';
 import Footer from '@/components/footer';
 import EditGameClient from './edit-game-client';
-import { Metadata } from 'next';
 
 // Define the props type for Next.js 15
 type Props = {
