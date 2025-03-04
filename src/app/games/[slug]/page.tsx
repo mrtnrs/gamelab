@@ -103,7 +103,7 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
 
     console.log(`Generating static paths for ${games.length} games`);
 
-    // For each game, generate a slug from the title
+    // For each game, generate a slug from the title using our enhanced utility
     const paths = games.map((game) => {
       const slug = generateSlug(game.title);
       console.log(`Generated slug for "${game.title}": ${slug}`);

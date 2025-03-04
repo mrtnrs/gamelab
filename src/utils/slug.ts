@@ -18,7 +18,13 @@
 export function generateSlug(text: string): string {
   if (!text) return '';
   
-  return text
+  // Special handling for common problematic characters
+  const normalized = text
+    .replace(/'/g, '')     // Remove apostrophes completely
+    .replace(/&/g, 'and')  // Replace & with 'and'
+    .replace(/\+/g, 'plus') // Replace + with 'plus'
+  
+  return normalized
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
@@ -39,6 +45,13 @@ export function getSlugVariations(text: string): string[] {
   const normalizedText = text.toLowerCase().trim();
   const standardSlug = generateSlug(normalizedText);
   
+  // Handle apostrophes specially
+  const withoutApostrophes = normalizedText.replace(/'/g, '');
+  const apostropheVariations = [
+    withoutApostrophes.replace(/\s+/g, '-'),
+    withoutApostrophes.replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''),
+  ];
+  
   return [
     standardSlug,                                  // Standard slug
     normalizedText.replace(/\s+/g, '-'),           // Simple spaces to hyphens
@@ -46,6 +59,7 @@ export function getSlugVariations(text: string): string[] {
     normalizedText.replace(/[^a-z0-9]/g, ''),      // Alphanumeric only
     standardSlug.replace(/-/g, '.'),               // Hyphens to dots
     standardSlug + '-',                            // With trailing hyphen
+    ...apostropheVariations,                        // Variations without apostrophes
   ].filter(Boolean);  // Remove any empty strings
 }
 
@@ -68,8 +82,19 @@ export function slugsMatch(slug1: string, slug2: string): boolean {
   // Direct match check
   if (s1 === s2) return true;
   
+  // Special handling for apostrophes
+  const s1WithoutApostrophe = s1.replace(/'/g, '');
+  const s2WithoutApostrophe = s2.replace(/'/g, '');
+  
+  if (s1WithoutApostrophe === s2WithoutApostrophe) return true;
+  
+  // Generate all possible variations
   const variations1 = getSlugVariations(s1);
   const variations2 = getSlugVariations(s2);
+  
+  // Add direct variations for apostrophes
+  variations1.push(s1WithoutApostrophe);
+  variations2.push(s2WithoutApostrophe);
   
   // Check if any variation of slug1 matches any variation of slug2
   if (variations1.some(v1 => variations2.some(v2 => v1 === v2))) {
@@ -77,7 +102,9 @@ export function slugsMatch(slug1: string, slug2: string): boolean {
   }
   
   // Check if one is contained within the other
-  if (s1.includes(s2) || s2.includes(s1)) {
+  if (s1.includes(s2) || s2.includes(s1) || 
+      s1WithoutApostrophe.includes(s2WithoutApostrophe) || 
+      s2WithoutApostrophe.includes(s1WithoutApostrophe)) {
     return true;
   }
   

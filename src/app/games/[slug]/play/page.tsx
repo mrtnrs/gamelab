@@ -4,6 +4,7 @@ import GamePlayClient from './game-play-client';
 import { supabase } from '@/utils/supabase';
 import { Metadata, ResolvingMetadata } from 'next';
 import { gameService } from '@/services/game-service';
+import { generateSlug } from '@/utils/slug';
 
 // Define props type consistently for both page and metadata
 type Props = {
@@ -90,7 +91,7 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
   try {
     const { data: games, error } = await supabase
       .from('games')
-      .select('title') // Update to 'slug' if your table has a slug column
+      .select('title')
       .eq('status', 'published');
 
     if (error) {
@@ -98,9 +99,18 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
       return [];
     }
 
-    return games.map((game) => ({
-      slug: game.title.toLowerCase().replace(/\s+/g, '-'),
-    }));
+    if (!games || games.length === 0) {
+      console.log('No published games found for static paths');
+      return [];
+    }
+
+    // For each game, generate a slug from the title using our enhanced utility
+    const paths = games.map((game) => {
+      const slug = generateSlug(game.title);
+      return { slug };
+    });
+
+    return paths;
   } catch (error) {
     console.error('Error in generateStaticParams:', error);
     return [];
