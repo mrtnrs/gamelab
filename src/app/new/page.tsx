@@ -7,6 +7,7 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
+import { generateSlug } from '@/utils/slug'
 
 export default function NewAndPopularPage() {
   const [activeTab, setActiveTab] = useState('trending')
@@ -106,7 +107,7 @@ export default function NewAndPopularPage() {
               key={game.id}
               id={game.id}
               title={game.title}
-              slug={game.title.toLowerCase().replace(/\s+/g, '-')}
+              slug={generateSlug(game.title)}
               image={game.image_url}
               rating={game.rating_average}
               year={new Date(game.created_at).getFullYear().toString()}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiSave, FiX } from 'react-icons/fi'
 import { gameService, Category, CategoryFormData } from '@/services/game-service'
+import { generateSlug } from '@/utils/slug'
 
 export default function CategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -56,7 +57,7 @@ export default function CategoryManagement() {
     if (name === 'name') {
       setCurrentCategory(prev => ({
         ...prev,
-        slug: value.toLowerCase().replace(/\s+/g, '-')
+        slug: generateSlug(value)
       }))
     }
   }
