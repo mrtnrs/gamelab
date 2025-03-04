@@ -30,7 +30,10 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
   }
   
   return (
-    <div className="group relative rounded-md overflow-hidden transition-all duration-300">
+    <Link 
+      href={`/games/${safeSlug}`}
+      className="group relative rounded-md overflow-hidden transition-all duration-300 block"
+    >
       <div className="aspect-[2/3] relative overflow-hidden rounded-md">
         <Image
           src={image}
@@ -64,16 +67,13 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
       
       <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex justify-between items-center mb-2">
-          <Link 
-            href={`/games/${safeSlug}`} 
-            className="text-white font-semibold hover:text-primary hover:underline transition-colors"
-          >
+          <h3 className="text-white font-semibold group-hover:text-primary transition-colors">
             {title}
-          </Link>
+          </h3>
           
           <button 
             onClick={handleBookmarkClick}
-            className="bg-black/30 hover:bg-black/50 dark:bg-white/20 dark:hover:bg-white/30 rounded-full p-2 transition-colors backdrop-blur-sm"
+            className="bg-black/30 hover:bg-black/50 dark:bg-white/20 dark:hover:bg-white/30 rounded-full p-2 transition-colors backdrop-blur-sm z-10"
             aria-label={bookmarked ? "Remove from bookmarks" : "Add to bookmarks"}
           >
             {bookmarked ? (
@@ -84,6 +84,6 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
           </button>
         </div>
       </div>
-    </div>
+    </Link>
   )
 }
