@@ -11,6 +11,8 @@ type Props = {
   params: Promise<{ slug: string }>;
 };
 
+export const dynamicParams = false;
+
 // Generate metadata for the game play page
 export async function generateMetadata(
   { params }: Props, // Use the same Props type
@@ -66,7 +68,7 @@ export async function generateMetadata(
 }
 
 // Static generation configuration
-export const dynamicParams = false; // Only pre-render known slugs at build time
+ // Only pre-render known slugs at build time
 // export const runtime = 'edge'; // Uncomment if you want Edge runtime
 
 // Main page component
