@@ -8,7 +8,7 @@ type Props = {
   params: Promise<{ id: string }>; // Updated for Next.js 15
 };
 
-export const runtime = 'edge';
+// export const runtime = 'edge';
 
 // Async Server Component
 export default async function EditGamePage({ params }: Props) {
