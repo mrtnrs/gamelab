@@ -32,7 +32,7 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
   return (
     <Link 
       href={`/games/${safeSlug}`}
-      className="group relative rounded-md overflow-hidden transition-all duration-300 block"
+      className="relative rounded-md overflow-hidden transition-all duration-300 block"
     >
       <div className="aspect-[2/3] relative overflow-hidden rounded-md">
         <Image
@@ -40,7 +40,7 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
           alt={title}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-75"
+          className="object-cover transition-all duration-500 hover:scale-110 hover:brightness-75"
         />
         
         {year && (
@@ -67,7 +67,7 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
       
       <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-white font-semibold group-hover:text-primary transition-colors">
+          <h3 className="text-white font-semibold hover:text-primary transition-colors">
             {title}
           </h3>
           
