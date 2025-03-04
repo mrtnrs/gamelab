@@ -50,13 +50,17 @@ type FormattedGame = {
 
 // Function to convert a game object to a display-friendly format
 const formatGameForDisplay = (game: Game): FormattedGame => {
+  // Use a placeholder image if image_url is missing
+  const defaultImage = '/placeholder-game.jpg';
+  const imageUrl = game.image_url || defaultImage;
+  
   return {
     id: game.id,
     title: game.title,
     url: game.url,
     slug: game.slug || generateSlug(game.title),
     description: game.description,
-    feature_image: game.image_url,
+    feature_image: imageUrl,
     year: new Date(game.created_at).getFullYear().toString(),
     rating_average: game.rating_average || 0,
     rating_count: game.rating_count || 0,
@@ -66,7 +70,7 @@ const formatGameForDisplay = (game: Game): FormattedGame => {
       social_link: game.developer_url || "#"
     },
     features: game.tags || [],
-    gallery: game.gallery_images || [game.image_url],
+    gallery: game.gallery_images || [imageUrl],
     is_multiplayer: game.is_multiplayer,
     is_mobile_compatible: game.is_mobile_compatible,
     visit_count: game.visit_count || 0
@@ -613,12 +617,16 @@ export default function GameDetailClient({ slug }: { slug: string }) {
           games={similarGames.map(g => {
             // Use the normalized slug utility function
             const slug = g.slug || generateSlug(g.title);
+            // Use a placeholder image if image_url is missing
+            const defaultImage = '/placeholder-game.jpg';
+            const imageUrl = g.image_url || defaultImage;
+            
             console.log('Processing similar game:', g.title, 'with slug:', slug);
             return {
               id: g.id,
               title: g.title,
               slug: slug,
-              image: g.image_url,
+              image: imageUrl,
               year: new Date(g.created_at).getFullYear().toString(),
               rating: g.rating_average || 0
             };

@@ -19,6 +19,8 @@ export interface Game {
   rating_total?: number;
   rating_average?: number;
   visit_count?: number;
+  slug?: string; // Added slug property
+  category_id?: string; // Added category_id property for consistency
 }
 
 export type GameFormData = Omit<Game, 'id' | 'created_at' | 'updated_at'> & {
