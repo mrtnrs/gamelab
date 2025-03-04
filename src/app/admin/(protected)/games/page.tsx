@@ -128,7 +128,7 @@ function AdminGamesContent() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">Games Management</h1>
           <Link
-            href="/admin/games/new"
+            href="/admin/(protected)/games/new"
             className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
           >
             <FiPlus className="mr-2 h-4 w-4" />
@@ -253,7 +253,7 @@ function AdminGamesContent() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
                           <Link
-                            href={`/admin/games/edit/${game.id}`}
+                            href={`/admin/(protected)/games/edit/${game.id}`}
                             className="text-primary hover:text-primary/80"
                           >
                             <FiEdit2 className="h-5 w-5" />
