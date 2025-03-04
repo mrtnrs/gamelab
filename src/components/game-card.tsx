@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
 import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa'
 import { useBookmarks } from '@/contexts/bookmark-context'
+import { generateSlug } from '@/utils/slug'
 
 interface GameCardProps {
   id: string
@@ -19,10 +20,13 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
   const { isBookmarked, toggleBookmark } = useBookmarks()
   const bookmarked = isBookmarked(id)
   
+  // Normalize the slug using our utility function
+  const safeSlug = slug || generateSlug(title || 'game')
+  
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    toggleBookmark({ id, title, slug, image, year, rating })
+    toggleBookmark({ id, title, slug: safeSlug, image, year, rating })
   }
   
   return (
@@ -61,7 +65,7 @@ export default function GameCard({ id, title, slug, image, rating, year }: GameC
       <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex justify-between items-center mb-2">
           <Link 
-            href={`/games/${slug}`} 
+            href={`/games/${safeSlug}`} 
             className="text-white font-semibold hover:text-primary hover:underline transition-colors"
           >
             {title}

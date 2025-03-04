@@ -13,6 +13,7 @@ import { Game } from '@/types/game'
 import { toast } from 'react-hot-toast'
 import { useBookmarks } from '@/contexts/bookmark-context'
 import { formatDistanceToNow } from 'date-fns'
+import { generateSlug } from '@/utils/slug'
 
 // Game carousel item type
 type GameCarouselItem = {
@@ -53,7 +54,7 @@ const formatGameForDisplay = (game: Game): FormattedGame => {
     id: game.id,
     title: game.title,
     url: game.url,
-    slug: game.title.toLowerCase().replace(/\s+/g, '-'),
+    slug: game.slug || generateSlug(game.title),
     description: game.description,
     feature_image: game.image_url,
     year: new Date(game.created_at).getFullYear().toString(),
@@ -168,7 +169,9 @@ export default function GameDetailClient({ slug }: { slug: string }) {
   const fetchSimilarGames = async (gameId: string, tags: string[]) => {
     setLoadingSimilarGames(true);
     try {
+      console.log('Fetching similar games for:', gameId, 'with tags:', tags);
       const similarGamesData = await gameService.getSimilarGames(gameId, tags);
+      console.log('Similar games returned:', similarGamesData.length, similarGamesData);
       setSimilarGames(similarGamesData);
     } catch (error) {
       console.error('Error fetching similar games:', error);
@@ -607,14 +610,19 @@ export default function GameDetailClient({ slug }: { slug: string }) {
         {/* Similar Games */}
         <GameCarousel 
           title="Similar Games" 
-          games={similarGames.map(g => ({
-            id: g.id,
-            title: g.title,
-            slug: g.title.toLowerCase().replace(/\s+/g, '-'),
-            image: g.image_url,
-            year: new Date(g.created_at).getFullYear().toString(),
-            rating: g.rating_average || 0
-          }))}
+          games={similarGames.map(g => {
+            // Use the normalized slug utility function
+            const slug = g.slug || generateSlug(g.title);
+            console.log('Processing similar game:', g.title, 'with slug:', slug);
+            return {
+              id: g.id,
+              title: g.title,
+              slug: slug,
+              image: g.image_url,
+              year: new Date(g.created_at).getFullYear().toString(),
+              rating: g.rating_average || 0
+            };
+          })}
           viewAllLink="/games"
           loading={loadingSimilarGames}
         />

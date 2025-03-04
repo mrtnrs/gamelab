@@ -1,4 +1,5 @@
-import { supabase } from '@/utils/supabase';
+import { supabase } from '@/utils/supabase'
+import { generateSlug, getSlugVariations, slugsMatch } from '@/utils/slug';
 import { Game, GameFormData } from '@/types/game';
 
 // Comment type definition
@@ -71,10 +72,10 @@ export const gameService = {
   
   async getGamesByCategory(categorySlug: string): Promise<Game[]> {
     try {
-      // First get the category ID from the slug
+      // First get the category from the slug
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
-        .select('id')
+        .select('id, name')
         .eq('slug', categorySlug)
         .single();
       
@@ -83,20 +84,32 @@ export const gameService = {
         return [];
       }
       
-      // Then get games with that category ID
+      // Get all published games
       const { data, error } = await supabase
         .from('games')
         .select('*')
-        .eq('category_id', categoryData.id)
         .eq('status', 'published')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error(`Error fetching games by category ${categorySlug}:`, error);
+        console.error(`Error fetching games for category ${categorySlug}:`, error);
         return [];
       }
       
-      return data || [];
+      // Filter games by category name (case-insensitive)
+      const categoryName = categoryData.name.toLowerCase();
+      console.log(`Filtering games by category name (case-insensitive): ${categoryName}`);
+      
+      const filteredGames = data.filter(game => {
+        // Handle both direct category_id match and case-insensitive category name match
+        const matchesById = game.category_id === categoryData.id;
+        const matchesByName = game.category && game.category.toLowerCase() === categoryName;
+        
+        return matchesById || matchesByName;
+      });
+      
+      console.log(`Found ${filteredGames.length} games in category ${categoryData.name}`);
+      return filteredGames || [];
     } catch (error) {
       console.error('Error in getGamesByCategory:', error);
       return [];
@@ -130,32 +143,93 @@ export const gameService = {
   
   async getGameBySlug(slug: string): Promise<Game | null> {
     try {
-      // Convert slug to title format by replacing hyphens with spaces and capitalizing words
-      const title = slug
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      
-      const { data, error } = await supabase
-        .from('games')
-        .select('*')
-        .ilike('title', title)
-        .eq('status', 'published')
-        .single();
-      
-      if (error) {
-        console.error(`Error fetching game with slug ${slug}:`, error);
+      if (!slug) {
+        console.error('Empty slug provided to getGameBySlug');
         return null;
       }
+
+      console.log(`[getGameBySlug] Looking for game with slug: ${slug}`);
       
-      // Increment visit count in the background
-      if (data) {
-        this.incrementVisitCount(data.id).catch(err => {
-          console.error('Error incrementing visit count:', err);
-        });
+      // Get all published games
+      const { data: allGames, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published');
+      
+      if (error) {
+        console.error('Error fetching games:', error);
+        return null;
+      }
+
+      if (!allGames || allGames.length === 0) {
+        console.log('No published games found');
+        return null;
+      }
+
+      console.log(`[getGameBySlug] Found ${allGames.length} published games`);
+      
+      // First pass: Try to find an exact match by title-generated slug
+      const generatedSlug = generateSlug(slug);
+      console.log(`[getGameBySlug] Generated slug: ${generatedSlug}`);
+      
+      // Multi-pass matching
+      let matchedGame: Game | null = null;
+      
+      // Pass 1: Try exact title match (case insensitive)
+      matchedGame = allGames.find(game => {
+        const gameSlug = generateSlug(game.title);
+        const exactMatch = gameSlug.toLowerCase() === generatedSlug.toLowerCase();
+        if (exactMatch) console.log(`[getGameBySlug] Found exact match: ${game.title}`);
+        return exactMatch;
+      }) || null;
+      
+      // Pass 2: Try slug matching with our utility
+      if (!matchedGame) {
+        matchedGame = allGames.find(game => {
+          const gameSlug = generateSlug(game.title);
+          const match = slugsMatch(gameSlug, slug);
+          if (match) console.log(`[getGameBySlug] Found match using slugsMatch: ${game.title}`);
+          return match;
+        }) || null;
       }
       
-      return data;
+      // Pass 3: Try partial title match
+      if (!matchedGame) {
+        matchedGame = allGames.find(game => {
+          const gameTitle = game.title.toLowerCase();
+          const searchSlug = slug.toLowerCase().replace(/-/g, ' ');
+          const partialMatch = gameTitle.includes(searchSlug) || searchSlug.includes(gameTitle);
+          if (partialMatch) console.log(`[getGameBySlug] Found partial match: ${game.title}`);
+          return partialMatch;
+        }) || null;
+      }
+      
+      // Pass 4: Try matching first word
+      if (!matchedGame) {
+        const firstWord = slug.split('-')[0];
+        if (firstWord && firstWord.length > 2) {
+          matchedGame = allGames.find(game => {
+            const gameFirstWord = game.title.split(' ')[0].toLowerCase();
+            const match = gameFirstWord === firstWord.toLowerCase();
+            if (match) console.log(`[getGameBySlug] Found first word match: ${game.title}`);
+            return match;
+          }) || null;
+        }
+      }
+      
+      if (matchedGame) {
+        console.log(`[getGameBySlug] Successfully found game: ${matchedGame.title}`);
+        
+        // Increment visit count in the background
+        this.incrementVisitCount(matchedGame.id).catch(err => {
+          console.error('Error incrementing visit count:', err);
+        });
+        
+        return matchedGame;
+      } else {
+        console.log(`[getGameBySlug] No game found for slug: ${slug}`);
+        return null;
+      }
     } catch (error) {
       console.error('Error in getGameBySlug:', error);
       return null;
@@ -334,15 +408,13 @@ export const gameService = {
     limit?: number
   }): Promise<Game[]> {
     try {
+      // Base query to get all published games
       let query = supabase
         .from('games')
         .select('*')
         .eq('status', 'published');
       
-      if (options.categoryId && options.categoryId !== 'all') {
-        query = query.eq('category_id', options.categoryId);
-      }
-      
+      // Apply mobile and multiplayer filters directly in the query
       if (options.mobileOnly) {
         query = query.eq('is_mobile_compatible', true);
       }
@@ -351,8 +423,10 @@ export const gameService = {
         query = query.eq('is_multiplayer', true);
       }
       
+      // Apply sorting
       query = query.order('created_at', { ascending: false });
       
+      // Apply limit if specified
       if (options.limit) {
         query = query.limit(options.limit);
       }
@@ -364,7 +438,38 @@ export const gameService = {
         return [];
       }
       
-      return data || [];
+      // If no category filter or 'all' category, return all games
+      if (!options.categoryId || options.categoryId === 'all') {
+        return data || [];
+      }
+      
+      // For category filtering, we need to handle it post-query for case insensitivity
+      // First get the category name
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('id', options.categoryId)
+        .single();
+      
+      if (categoryError || !categoryData) {
+        console.error(`Error fetching category with id ${options.categoryId}:`, categoryError);
+        return [];
+      }
+      
+      // Filter games by category (case-insensitive)
+      const categoryName = categoryData.name.toLowerCase();
+      console.log(`Filtering games by category (case-insensitive): ${categoryName}`);
+      
+      const filteredGames = data.filter(game => {
+        // Handle both direct category_id match and case-insensitive category name match
+        const matchesById = game.category_id === categoryData.id;
+        const matchesByName = game.category && game.category.toLowerCase() === categoryName;
+        
+        return matchesById || matchesByName;
+      });
+      
+      console.log(`Found ${filteredGames.length} games in category ${categoryData.name}`);
+      return filteredGames || [];
     } catch (error) {
       console.error('Error in getFilteredGames:', error);
       return [];
@@ -474,18 +579,49 @@ export const gameService = {
   
   async getCategoryBySlug(slug: string): Promise<Category | null> {
     try {
+      console.log(`Looking for category with slug: ${slug}`);
+      
+      // First try exact match
       const { data, error } = await supabase
         .from('categories')
         .select('*')
         .eq('slug', slug)
-        .single();
+        .maybeSingle();
+      
+      if (data) {
+        console.log(`Found category by exact slug match: ${data.name}`);
+        return data;
+      }
       
       if (error) {
         console.error(`Error fetching category with slug ${slug}:`, error);
         return null;
       }
       
-      return data;
+      // If no exact match, get all categories and do case-insensitive comparison
+      const { data: allCategories, error: allCategoriesError } = await supabase
+        .from('categories')
+        .select('*');
+      
+      if (allCategoriesError) {
+        console.error('Error fetching all categories:', allCategoriesError);
+        return null;
+      }
+      
+      // Try case-insensitive match
+      const normalizedSlug = slug.toLowerCase();
+      const matchedCategory = allCategories.find(category => 
+        category.slug.toLowerCase() === normalizedSlug ||
+        generateSlug(category.name).toLowerCase() === normalizedSlug
+      );
+      
+      if (matchedCategory) {
+        console.log(`Found category by case-insensitive match: ${matchedCategory.name}`);
+        return matchedCategory;
+      }
+      
+      console.log(`No category found for slug: ${slug}`);
+      return null;
     } catch (error) {
       console.error('Error in getCategoryBySlug:', error);
       return null;
@@ -516,7 +652,7 @@ export const gameService = {
     try {
       // Generate slug from name if not provided
       if (!categoryData.slug) {
-        categoryData.slug = categoryData.name.toLowerCase().replace(/\s+/g, '-');
+        categoryData.slug = generateSlug(categoryData.name);
       }
       
       const { data, error } = await supabase
@@ -548,7 +684,7 @@ export const gameService = {
     try {
       // Generate slug from name if name is provided but slug isn't
       if (categoryData.name && !categoryData.slug) {
-        categoryData.slug = categoryData.name.toLowerCase().replace(/\s+/g, '-');
+        categoryData.slug = generateSlug(categoryData.name);
       }
       
       const { error } = await supabase
@@ -715,6 +851,7 @@ export const gameService = {
   
   async getSimilarGames(gameId: string, tags: string[], limit: number = 5): Promise<Game[]> {
     try {
+      console.log('getSimilarGames called with gameId:', gameId, 'tags:', tags, 'limit:', limit);
       let result: Game[] = [];
       
       // First try to find games with matching tags
@@ -731,12 +868,14 @@ export const gameService = {
         if (error) {
           console.error(`Error fetching similar games for game ${gameId}:`, error);
         } else if (data) {
+          console.log('Found games with matching tags:', data.length);
           result = data;
         }
       }
       
       // If we don't have enough games with matching tags, get some popular games to fill the list
       if (result.length < limit) {
+        console.log('Not enough games with matching tags, fetching popular games');
         const remainingLimit = limit - result.length;
         const { data: popularGames, error: popularError } = await supabase
           .from('games')
@@ -748,12 +887,16 @@ export const gameService = {
           .limit(remainingLimit);
         
         if (!popularError && popularGames) {
+          console.log('Found popular games:', popularGames.length);
           result = [...result, ...popularGames];
+        } else if (popularError) {
+          console.error('Error fetching popular games:', popularError);
         }
       }
       
       // If we still don't have enough games, get random games to reach the minimum limit
       if (result.length < limit) {
+        console.log('Still not enough games, fetching random games by created_at');
         const remainingLimit = limit - result.length;
         const { data: randomGames, error: randomError } = await supabase
           .from('games')
@@ -765,12 +908,16 @@ export const gameService = {
           .limit(remainingLimit);
         
         if (!randomError && randomGames) {
+          console.log('Found random games by created_at:', randomGames.length);
           result = [...result, ...randomGames];
+        } else if (randomError) {
+          console.error('Error fetching random games by created_at:', randomError);
         }
       }
       
       // If we STILL don't have enough games, try one more approach with a different ordering
       if (result.length < limit) {
+        console.log('STILL not enough games, fetching any games');
         const remainingLimit = limit - result.length;
         const { data: moreRandomGames, error: moreRandomError } = await supabase
           .from('games')
@@ -781,10 +928,35 @@ export const gameService = {
           .limit(remainingLimit);
         
         if (!moreRandomError && moreRandomGames) {
+          console.log('Found more random games:', moreRandomGames.length);
           result = [...result, ...moreRandomGames];
+        } else if (moreRandomError) {
+          console.error('Error fetching more random games:', moreRandomError);
         }
       }
       
+      // As a last resort, if we still don't have enough games, just get ANY games
+      if (result.length < limit) {
+        console.log('FINAL ATTEMPT: Getting any games');
+        const remainingLimit = limit - result.length;
+        const { data: anyGames, error: anyError } = await supabase
+          .from('games')
+          .select('*')
+          .limit(remainingLimit);
+        
+        if (!anyError && anyGames) {
+          console.log('Found any games:', anyGames.length);
+          // Filter out the current game and any duplicates
+          const filteredGames = anyGames.filter(g => 
+            g.id !== gameId && !result.some(existing => existing.id === g.id)
+          );
+          result = [...result, ...filteredGames];
+        } else if (anyError) {
+          console.error('Error fetching any games:', anyError);
+        }
+      }
+      
+      console.log('Final result length:', result.length);
       return result;
     } catch (error) {
       console.error('Error in getSimilarGames:', error);

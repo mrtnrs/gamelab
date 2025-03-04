@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FiSave, FiX, FiUpload } from 'react-icons/fi';
 import { gameService, Category } from '@/services/game-service';
 import { Game, GameFormData } from '@/types/game';
+import { generateSlug } from '@/utils/slug';
 
 interface GameFormProps {
   gameId?: string;
@@ -37,6 +38,14 @@ export default function GameForm({ gameId, initialData, isEditing }: GameFormPro
     is_multiplayer: false,
     ...initialData
   });
+  
+  // Generate a slug whenever the title changes
+  useEffect(() => {
+    if (formData.title) {
+      const slug = generateSlug(formData.title);
+      setFormData(prev => ({ ...prev, slug }));
+    }
+  }, [formData.title]);
 
   const isEditingMode = isEditing !== undefined ? isEditing : !!gameId;
 

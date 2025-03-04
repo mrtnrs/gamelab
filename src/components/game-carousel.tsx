@@ -26,6 +26,9 @@ export default function GameCarousel({ title, games, viewAllLink, loading = fals
   const [showLeftButton, setShowLeftButton] = useState(false)
   const [showRightButton, setShowRightButton] = useState(true)
   
+  // Debug log for games array
+  console.log(`GameCarousel '${title}' received ${games.length} games:`, games)
+  
   const scroll = (direction: 'left' | 'right') => {
     if (!carouselRef.current) return
     
@@ -91,12 +94,18 @@ export default function GameCarousel({ title, games, viewAllLink, loading = fals
                 </div>
               </div>
             ))
-          ) : games.length > 0 ? (
-            games.map((game) => (
-              <div key={game.id} className="flex-shrink-0 w-[250px]">
-                <GameCard {...game} />
-              </div>
-            ))
+          ) : games && games.length > 0 ? (
+            games.map((game) => {
+              if (!game) {
+                console.error('Null or undefined game in carousel');
+                return null;
+              }
+              return (
+                <div key={game.id} className="flex-shrink-0 w-[250px]">
+                  <GameCard {...game} />
+                </div>
+              );
+            })
           ) : (
             <div className="py-8 text-center text-muted-foreground w-full">
               No games found

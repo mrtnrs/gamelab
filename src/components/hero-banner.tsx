@@ -6,6 +6,7 @@ import { FiPlay } from 'react-icons/fi'
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
 import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa'
 import { useBookmarks } from '@/contexts/bookmark-context'
+import { generateSlug } from '@/utils/slug'
 
 interface HeroBannerProps {
   title: string
@@ -31,8 +32,11 @@ export default function HeroBanner({
   const { isBookmarked, toggleBookmark } = useBookmarks()
   const bookmarked = isBookmarked(id)
   
+  // Normalize the slug
+  const safeSlug = slug || generateSlug(title)
+  
   const handleBookmarkClick = () => {
-    toggleBookmark({ id, title, slug, image, year })
+    toggleBookmark({ id, title, slug: safeSlug, image, year })
   }
   
   return (
@@ -82,7 +86,7 @@ export default function HeroBanner({
           
           <div className="flex flex-wrap gap-4">
             <Link 
-              href={`/games/${slug}`}
+              href={`/games/${safeSlug}`}
               className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-md flex items-center space-x-2 transition-colors"
             >
               <FiPlay className="h-5 w-5" />
