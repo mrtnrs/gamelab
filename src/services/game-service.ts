@@ -199,14 +199,13 @@ export const gameService = {
     }
   },
   
-  async getTopRatedGames(limit: number = 5): Promise<Game[]> {
+  async getTopRatedGames(limit: number = 10): Promise<Game[]> {
     try {
       const { data, error } = await supabase
         .from('games')
         .select('*')
         .eq('status', 'published')
-        .gt('rating_count', 0) // Only include games with at least one rating
-        .order('rating_average', { ascending: false })
+        .order('visit_count', { ascending: false })
         .limit(limit);
       
       if (error) {
@@ -217,6 +216,27 @@ export const gameService = {
       return data || [];
     } catch (error) {
       console.error('Error in getTopRatedGames:', error);
+      return [];
+    }
+  },
+  
+  async getNewReleases(limit: number = 10): Promise<Game[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      if (error) {
+        console.error('Error fetching new releases:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getNewReleases:', error);
       return [];
     }
   },

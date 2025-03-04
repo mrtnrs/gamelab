@@ -2,13 +2,16 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { FiPlay, FiInfo, FiPlus } from 'react-icons/fi'
+import { FiPlay } from 'react-icons/fi'
+import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
+import { useBookmarks } from '@/contexts/bookmark-context'
 
 interface HeroBannerProps {
   title: string
   description: string
   slug: string
   image: string
+  id: string
   year?: string
   rating?: string
 }
@@ -18,9 +21,17 @@ export default function HeroBanner({
   description, 
   slug, 
   image, 
+  id,
   year, 
   rating 
 }: HeroBannerProps) {
+  const { isBookmarked, toggleBookmark } = useBookmarks()
+  const bookmarked = isBookmarked(id)
+  
+  const handleBookmarkClick = () => {
+    toggleBookmark({ id, title, slug, image, year })
+  }
+  
   return (
     <div className="relative w-full h-[70vh] min-h-[500px]">
       <div className="absolute inset-0">
@@ -37,6 +48,12 @@ export default function HeroBanner({
       
       <div className="relative h-full container mx-auto px-4 flex flex-col justify-end pb-24">
         <div className="max-w-2xl">
+          <div className="flex items-center mb-2">
+            <span className="bg-red-600 text-white px-2 py-0.5 text-xs font-bold tracking-wider">
+              FEATURED
+            </span>
+          </div>
+          
           <h1 className="text-4xl md:text-6xl font-bold mb-4">{title}</h1>
           
           <div className="flex items-center space-x-4 mb-4">
@@ -56,23 +73,23 @@ export default function HeroBanner({
           
           <div className="flex flex-wrap gap-4">
             <Link 
-              href={`/games/${slug}/play`}
+              href={`/games/${slug}`}
               className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-md flex items-center space-x-2 transition-colors"
             >
               <FiPlay className="h-5 w-5" />
-              <span>Play Now</span>
+              <span>Discover</span>
             </Link>
             
-            <Link 
-              href={`/games/${slug}`}
-              className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-md flex items-center space-x-2 backdrop-blur-sm transition-colors"
+            <button 
+              onClick={handleBookmarkClick}
+              className="bg-black/30 hover:bg-black/50 dark:bg-white/20 dark:hover:bg-white/30 p-3 rounded-full backdrop-blur-sm transition-colors shadow-md"
+              aria-label={bookmarked ? "Remove from bookmarks" : "Add to bookmarks"}
             >
-              <FiInfo className="h-5 w-5" />
-              <span>More Info</span>
-            </Link>
-            
-            <button className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full backdrop-blur-sm transition-colors">
-              <FiPlus className="h-5 w-5" />
+              {bookmarked ? (
+                <BsBookmarkFill className="h-5 w-5 text-primary" />
+              ) : (
+                <BsBookmark className="h-5 w-5 text-white" />
+              )}
             </button>
           </div>
         </div>

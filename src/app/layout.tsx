@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/components/auth-provider";
+import { BookmarkProvider } from "@/contexts/bookmark-context";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,7 +42,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <BookmarkProvider>
+              {children}
+            </BookmarkProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

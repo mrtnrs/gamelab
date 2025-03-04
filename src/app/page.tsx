@@ -4,9 +4,11 @@ import HeroBanner from '@/components/hero-banner';
 import GameCarousel from '@/components/game-carousel';
 import { gameService } from '@/services/game-service';
 import { Game } from '@/types/game';
+import BookmarkedGamesSection from '@/components/bookmarked-games-section';
 
 // Fallback data in case database is empty
 const fallbackFeaturedGame = {
+  id: "1",
   title: "Army of the Dead",
   description: "A group of mercenaries takes the ultimate gamble by venturing into a quarantine zone following a zombie outbreak in Las Vegas in hopes of pulling off an impossible heist.",
   slug: "army-of-the-dead",
@@ -50,35 +52,39 @@ function formatGamesForCarousel(games: Game[]) {
     slug: game.title.toLowerCase().replace(/\s+/g, '-'),
     image: game.image_url,
     year: new Date(game.created_at).getFullYear().toString(),
-    rating: 8.5 // Default rating since we don't have this in our schema
+    rating: game.rating_average ? Math.round(game.rating_average * 10) / 10 : undefined
   }));
 }
 
 export default async function Home() {
   // Fetch games from Supabase
-  const allGames = await gameService.getGames();
-  const featuredGames = await gameService.getFeaturedGames();
+  const topRatedGames = await gameService.getTopRatedGames(10);
+  const newReleases = await gameService.getNewReleases(10);
   
-  // Use the first featured game for the hero banner or fallback
-  const featuredGame = featuredGames.length > 0 ? {
-    title: featuredGames[0].title,
-    description: featuredGames[0].description,
-    slug: featuredGames[0].title.toLowerCase().replace(/\s+/g, '-'),
-    image: featuredGames[0].image_url,
-    year: new Date(featuredGames[0].created_at).getFullYear().toString(),
-    rating: "9.5/10" // Default rating
+  // Get the most visited game for the hero banner
+  const mostVisitedGames = await gameService.getTopRatedGames(1);
+  
+  // Use the most visited game for the hero banner or fallback
+  const featuredGame = mostVisitedGames.length > 0 ? {
+    id: mostVisitedGames[0].id,
+    title: mostVisitedGames[0].title,
+    description: mostVisitedGames[0].description,
+    slug: mostVisitedGames[0].title.toLowerCase().replace(/\s+/g, '-'),
+    image: mostVisitedGames[0].image_url,
+    year: new Date(mostVisitedGames[0].created_at).getFullYear().toString(),
+    rating: mostVisitedGames[0].rating_average ? 
+      `${Math.round(mostVisitedGames[0].rating_average * 10) / 10}/5` : 
+      "Not rated"
   } : fallbackFeaturedGame;
   
-  // Prepare game categories
-  const actionGames = allGames.filter(game => game.category === 'Action');
-  const adventureGames = allGames.filter(game => game.category === 'Adventure');
-  const strategyGames = allGames.filter(game => game.category === 'Strategy');
-  
   // Format games for carousel or use fallbacks if empty
-  const trendingGames = allGames.length > 0 ? formatGamesForCarousel(allGames) : fallbackGames;
-  const topRatedGames = featuredGames.length > 0 ? formatGamesForCarousel(featuredGames) : fallbackGames;
-  const newGames = actionGames.length > 0 ? formatGamesForCarousel(actionGames) : fallbackGames;
-  const bookmarkedGames = adventureGames.length > 0 ? formatGamesForCarousel(adventureGames) : fallbackGames;
+  const formattedTopRatedGames = topRatedGames.length > 0 ? 
+    formatGamesForCarousel(topRatedGames) : 
+    fallbackGames;
+    
+  const formattedNewReleases = newReleases.length > 0 ? 
+    formatGamesForCarousel(newReleases) : 
+    fallbackGames;
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -89,28 +95,18 @@ export default async function Home() {
         
         <div className="container mx-auto px-4 py-8">
           <GameCarousel 
-            title="Trending Games" 
-            games={trendingGames} 
-            viewAllLink="/games?category=trending"
-          />
-          
-          <GameCarousel 
             title="Top Rated" 
-            games={topRatedGames} 
+            games={formattedTopRatedGames} 
             viewAllLink="/games?category=top-rated"
           />
           
           <GameCarousel 
             title="New Releases" 
-            games={newGames} 
+            games={formattedNewReleases} 
             viewAllLink="/games?category=new"
           />
           
-          <GameCarousel 
-            title="Bookmarked" 
-            games={bookmarkedGames} 
-            viewAllLink="/games?category=bookmarked"
-          />
+          <BookmarkedGamesSection />
         </div>
       </main>
       
