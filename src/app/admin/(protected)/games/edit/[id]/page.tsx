@@ -3,16 +3,16 @@ import Footer from '@/components/footer';
 import EditGameClient from './edit-game-client';
 import { Metadata } from 'next';
 
-// Define the props type with params as a Promise
+// Define the props type for Next.js 15
 type Props = {
-  params: Promise<{ id: string }>; // Updated for Next.js 15
+  params: { id: string };
 };
 
- export const runtime = 'edge'; // Commented out to fix build error
+// Removed edge runtime directive to fix Cloudflare deployment issues
 
 // Async Server Component
 export default async function EditGamePage({ params }: Props) {
-  const { id } = await params; // Await the Promise to get the id
+  const { id } = params; // Access id directly from params
 
   return (
     <div className="flex flex-col min-h-screen">

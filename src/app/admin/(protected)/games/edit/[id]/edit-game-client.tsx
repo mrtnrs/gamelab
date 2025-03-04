@@ -7,6 +7,14 @@ import AdminRouteGuard from '@/components/admin-route-guard'
 import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
+export default function EditGameClient({ id }: { id: string }) {
+  return (
+    <AdminRouteGuard>
+      <EditGameContent id={id} />
+    </AdminRouteGuard>
+  )
+}
+
 function EditGameContent({ id }: { id: string }) {
   const router = useRouter()
   const [game, setGame] = useState<Game | null>(null)
@@ -52,7 +60,7 @@ function EditGameContent({ id }: { id: string }) {
         <h2 className="text-xl font-semibold text-destructive mb-2">Error</h2>
         <p>{error || 'Game not found'}</p>
         <button 
-          onClick={() => router.push('/admin/games')}
+          onClick={() => router.push('/admin/(protected)/games')}
           className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Back to Games
@@ -66,13 +74,5 @@ function EditGameContent({ id }: { id: string }) {
       <p className="text-muted-foreground mb-6">Update information for {game.title}</p>
       <GameForm initialData={game} isEditing={true} />
     </div>
-  )
-}
-
-export default function EditGameClient({ id }: { id: string }) {
-  return (
-    <AdminRouteGuard>
-      <EditGameContent id={id} />
-    </AdminRouteGuard>
   )
 }

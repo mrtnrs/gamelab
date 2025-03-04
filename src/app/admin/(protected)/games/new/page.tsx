@@ -1,11 +1,9 @@
-"use client"
-
 import Header from '@/components/header'
 import Footer from '@/components/footer'
-import GameForm from '@/components/game-form'
-import AdminRouteGuard from '@/components/admin-route-guard'
+import NewGameClient from './new-game-client'
 
-function NewGameContent() {
+// Server Component
+export default async function NewGamePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -17,21 +15,11 @@ function NewGameContent() {
             <p className="text-muted-foreground mt-2">Create a new game to showcase on the platform</p>
           </div>
           
-          <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
-            <GameForm />
-          </div>
+          <NewGameClient />
         </div>
       </main>
       
       <Footer />
     </div>
-  )
-}
-
-export default function NewGamePage() {
-  return (
-    <AdminRouteGuard>
-      <NewGameContent />
-    </AdminRouteGuard>
   )
 }
