@@ -8,14 +8,11 @@ import Footer from '@/components/footer'
 import { FiSearch } from 'react-icons/fi'
 import { gameService } from '@/services/game-service'
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  image: string;
-  description?: string;
-  count: number;
-}
+// Import the Category type from the game service
+import { Category as GameServiceCategory } from '@/services/game-service'
+
+// Use the imported type
+type Category = GameServiceCategory;
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState('');

@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/header'
 import Footer from '@/components/footer'
-import { gameService } from '@/services/game-service'
+import { gameService, Category } from '@/services/game-service'
 import { GameFormData } from '@/types/game'
 import { FiSave, FiUpload } from 'react-icons/fi'
 import { supabase } from '@/utils/supabase'
@@ -13,6 +13,8 @@ export default function SubmitGamePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -22,7 +24,7 @@ export default function SubmitGamePage() {
     url: '',
     link_to_socials: '',
     email: '',
-    tags: [],
+    tags: [] as string[],
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -35,6 +37,23 @@ export default function SubmitGamePage() {
     const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(Boolean)
     setFormData((prev) => ({ ...prev, tags: tagsArray }))
   }
+  
+  // Fetch categories when component mounts
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true)
+      try {
+        const categoriesData = await gameService.getAllCategories()
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    
+    fetchCategories()
+  }, [])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -220,18 +239,18 @@ export default function SubmitGamePage() {
                         value={formData.category || ''}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                        disabled={loadingCategories}
                       >
                         <option value="">Select a category</option>
-                        <option value="Action">Action</option>
-                        <option value="Adventure">Adventure</option>
-                        <option value="RPG">RPG</option>
-                        <option value="Strategy">Strategy</option>
-                        <option value="Simulation">Simulation</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Racing">Racing</option>
-                        <option value="Puzzle">Puzzle</option>
-                        <option value="Shooter">Shooter</option>
-                        <option value="Platformer">Platformer</option>
+                        {loadingCategories ? (
+                          <option value="" disabled>Loading categories...</option>
+                        ) : (
+                          categories.map(category => (
+                            <option key={category.id} value={category.slug}>
+                              {category.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 

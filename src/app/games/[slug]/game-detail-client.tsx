@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import GameCarousel from '@/components/game-carousel'
+import { GameStructuredData } from '@/components/structured-data'
 import { FiPlay, FiExternalLink, FiStar, FiSend } from 'react-icons/fi'
 import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa'
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs'
@@ -243,8 +244,19 @@ export default function GameDetailClient({ slug }: { slug: string }) {
     );
   }
   
+  // Construct the canonical URL for structured data
+  const canonicalUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/games/${slug}` 
+    : `https://gamelab.example.com/games/${slug}`;
+
+  // Get the raw game data for structured data
+  const rawGame = game as unknown as Game;
+
   return (
     <>
+      {/* Add structured data for SEO */}
+      <GameStructuredData game={rawGame} url={canonicalUrl} />
+      
       {/* Hero Section */}
       <div className="relative w-full h-[70vh] min-h-[500px]">
         <div className="absolute inset-0">
@@ -422,7 +434,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
                     <h3 className="text-sm font-medium text-muted-foreground">Developer</h3>
                     <p>{game.creator.name}</p>
                   </div>
-                  <div>
+                  <div className="hidden">
                     <h3 className="text-sm font-medium text-muted-foreground">Visits</h3>
                     <p>{game.visit_count?.toLocaleString() || 0}</p>
                   </div>
@@ -598,7 +610,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
           games={similarGames.map(g => ({
             id: g.id,
             title: g.title,
-            slug: g.slug || g.title.toLowerCase().replace(/\s+/g, '-'),
+            slug: g.title.toLowerCase().replace(/\s+/g, '-'),
             image: g.image_url,
             year: new Date(g.created_at).getFullYear().toString(),
             rating: g.rating_average || 0

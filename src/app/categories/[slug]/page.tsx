@@ -114,7 +114,15 @@ export default function CategoryPage() {
           {games.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {games.map((game) => (
-                <GameCard key={game.id} game={game} />
+                <GameCard
+                  key={game.id}
+                  id={game.id}
+                  title={game.title}
+                  slug={game.title.toLowerCase().replace(/\s+/g, '-')}
+                  image={game.image_url}
+                  rating={game.rating_average}
+                  year={new Date(game.created_at).getFullYear().toString()}
+                />
               ))}
             </div>
           ) : (

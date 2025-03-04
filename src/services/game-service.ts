@@ -10,6 +10,24 @@ export interface GameComment {
   user_id?: string;
 }
 
+// Category type definition
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image: string;
+  description?: string;
+  count?: number;
+}
+
+// Category form data type
+export interface CategoryFormData {
+  name: string;
+  slug?: string;
+  image: string;
+  description?: string;
+}
+
 export const gameService = {
   async getGames(): Promise<Game[]> {
     try {
@@ -419,7 +437,7 @@ export const gameService = {
     }
   },
   
-  async getCategories(): Promise<any[]> {
+  async getCategories(): Promise<Category[]> {
     try {
       const { data, error } = await supabase.rpc('get_categories_with_counts');
       
@@ -435,7 +453,26 @@ export const gameService = {
     }
   },
   
-  async getCategoryBySlug(slug: string): Promise<any | null> {
+  async getAllCategories(): Promise<Category[]> {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching all categories:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAllCategories:', error);
+      return [];
+    }
+  },
+  
+  async getCategoryBySlug(slug: string): Promise<Category | null> {
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -452,6 +489,127 @@ export const gameService = {
     } catch (error) {
       console.error('Error in getCategoryBySlug:', error);
       return null;
+    }
+  },
+  
+  async getCategoryById(id: string): Promise<Category | null> {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error(`Error fetching category with id ${id}:`, error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getCategoryById:', error);
+      return null;
+    }
+  },
+  
+  async createCategory(categoryData: CategoryFormData): Promise<{ success: boolean; id?: string; error?: any }> {
+    try {
+      // Generate slug from name if not provided
+      if (!categoryData.slug) {
+        categoryData.slug = categoryData.name.toLowerCase().replace(/\s+/g, '-');
+      }
+      
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([
+          {
+            name: categoryData.name,
+            slug: categoryData.slug,
+            image: categoryData.image,
+            description: categoryData.description || '',
+          }
+        ])
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Error creating category:', error);
+        return { success: false, error };
+      }
+      
+      return { success: true, id: data.id };
+    } catch (error) {
+      console.error('Error in createCategory:', error);
+      return { success: false, error };
+    }
+  },
+  
+  async updateCategory(id: string, categoryData: Partial<CategoryFormData>): Promise<{ success: boolean; error?: any }> {
+    try {
+      // Generate slug from name if name is provided but slug isn't
+      if (categoryData.name && !categoryData.slug) {
+        categoryData.slug = categoryData.name.toLowerCase().replace(/\s+/g, '-');
+      }
+      
+      const { error } = await supabase
+        .from('categories')
+        .update({
+          name: categoryData.name,
+          slug: categoryData.slug,
+          image: categoryData.image,
+          description: categoryData.description,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating category:', error);
+        return { success: false, error };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateCategory:', error);
+      return { success: false, error };
+    }
+  },
+  
+  async deleteCategory(id: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      // First, check if there are games using this category
+      const { data: games, error: checkError } = await supabase
+        .from('games')
+        .select('id')
+        .eq('category_id', id);
+      
+      if (checkError) {
+        console.error('Error checking games with category:', checkError);
+        return { success: false, error: checkError };
+      }
+      
+      // If there are games using this category, don't delete it
+      if (games && games.length > 0) {
+        return { 
+          success: false, 
+          error: { message: `Cannot delete category because it is used by ${games.length} games. Please reassign these games to another category first.` }
+        };
+      }
+      
+      // Delete the category if it's not being used
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error deleting category:', error);
+        return { success: false, error };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteCategory:', error);
+      return { success: false, error };
     }
   },
   

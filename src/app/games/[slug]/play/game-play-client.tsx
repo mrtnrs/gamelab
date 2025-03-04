@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { FiArrowLeft } from 'react-icons/fi'
 import { toast } from 'react-hot-toast'
 import GamePlayer from '@/components/game-player'
+import { GameStructuredData } from '@/components/structured-data'
 import { gameService } from '@/services/game-service'
 import { Game } from '@/types/game'
 
@@ -67,8 +68,15 @@ export default function GamePlayClient({ slug }: { slug: string }) {
     )
   }
 
+  // Construct the canonical URL for structured data
+  const canonicalUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/games/${slug}/play` 
+    : `https://gamelab.example.com/games/${slug}/play`;
+
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Add structured data for SEO */}
+      <GameStructuredData game={game} url={canonicalUrl} />
       <div className="mb-6 flex items-center justify-between">
         <Link 
           href={`/games/${slug}`}

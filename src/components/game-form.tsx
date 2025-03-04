@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiSave, FiX, FiUpload } from 'react-icons/fi';
-import { gameService } from '@/services/game-service';
+import { gameService, Category } from '@/services/game-service';
 import { Game, GameFormData } from '@/types/game';
 
 interface GameFormProps {
@@ -15,6 +15,8 @@ interface GameFormProps {
 export default function GameForm({ gameId, initialData, isEditing }: GameFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -37,6 +39,23 @@ export default function GameForm({ gameId, initialData, isEditing }: GameFormPro
   });
 
   const isEditingMode = isEditing !== undefined ? isEditing : !!gameId;
+
+  // Fetch categories when component mounts
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const categoriesData = await gameService.getAllCategories();
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     if (isEditingMode && gameId && !initialData) {
@@ -427,17 +446,18 @@ export default function GameForm({ gameId, initialData, isEditing }: GameFormPro
               value={formData.category || ''}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={loadingCategories}
             >
               <option value="">Select a category</option>
-              <option value="Action">Action</option>
-              <option value="Adventure">Adventure</option>
-              <option value="RPG">RPG</option>
-              <option value="Strategy">Strategy</option>
-              <option value="Puzzle">Puzzle</option>
-              <option value="Simulation">Simulation</option>
-              <option value="Sports">Sports</option>
-              <option value="Racing">Racing</option>
-              <option value="Other">Other</option>
+              {loadingCategories ? (
+                <option value="" disabled>Loading categories...</option>
+              ) : (
+                categories.map(category => (
+                  <option key={category.id} value={category.slug}>
+                    {category.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

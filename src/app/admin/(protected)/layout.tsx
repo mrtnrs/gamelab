@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { FiHome, FiGrid, FiUsers, FiSettings, FiLogOut, FiMenu, FiX } from 'react-icons/fi'
+import { FiHome, FiGrid, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiTag } from 'react-icons/fi'
 import { ThemeToggle } from '@/components/theme-toggle'
 import ProtectedRoute from '@/components/protected-route'
 import { useAuth } from '@/contexts/auth-context'
@@ -111,6 +111,17 @@ export default function AdminLayout({
                 Games
               </Link>
               <Link
+                href="/admin/categories"
+                className={`flex items-center px-3 py-2 rounded-md ${
+                  isActive('/admin/categories')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent'
+                }`}
+              >
+                <FiTag className="mr-3 h-5 w-5" />
+                Categories
+              </Link>
+              <Link
                 href="/admin/settings"
                 className={`flex items-center px-3 py-2 rounded-md ${
                   isActive('/admin/settings')
@@ -181,6 +192,18 @@ export default function AdminLayout({
               >
                 <FiGrid className={`${isSidebarOpen ? 'mr-3' : ''} h-5 w-5`} />
                 {isSidebarOpen && <span>Games</span>}
+              </Link>
+              <Link
+                href="/admin/categories"
+                className={`flex items-center px-3 py-2 rounded-md ${
+                  isActive('/admin/categories')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent'
+                } ${!isSidebarOpen && 'justify-center'}`}
+                title="Categories"
+              >
+                <FiTag className={`${isSidebarOpen ? 'mr-3' : ''} h-5 w-5`} />
+                {isSidebarOpen && <span>Categories</span>}
               </Link>
               <Link
                 href="/admin/users"
