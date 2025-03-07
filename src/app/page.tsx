@@ -1,6 +1,7 @@
 import Header from '@/components/header';
 import Footer from '@/components/footer';
 import HeroBanner from '@/components/hero-banner';
+import HeroBannerSlider from '@/components/hero-banner-slider';
 import GameCarousel from '@/components/game-carousel';
 import { gameService } from '@/services/game-service';
 import { Game } from '@/types/game';
@@ -59,8 +60,10 @@ function formatGamesForCarousel(games: Game[]) {
       title: game.title,
       slug: slug,
       image: imageUrl,
-      year: new Date(game.created_at).getFullYear().toString(),
-      rating: game.rating_average ? Math.round(game.rating_average * 10) / 10 : undefined
+      year: new Date(game.created_at).toLocaleString('default', { month: 'short' }) + ' ' + new Date(game.created_at).getFullYear(),
+      rating: game.rating_average ? Math.round(game.rating_average * 10) / 10 : undefined,
+      is_mobile_compatible: game.is_mobile_compatible,
+      is_multiplayer: game.is_multiplayer
     };
   });
 }
@@ -71,6 +74,7 @@ export default async function Home() {
   const newReleases = await gameService.getNewReleases(10);
   const mobileGames = await gameService.getMobileGames(10);
   const trendingGames = await gameService.getTrendingGames(10);
+  const multiplayerGames = await gameService.getMultiplayerGames(10);
   
   // Get featured game for the hero banner
   const featuredGames = await gameService.getFeaturedGames();
@@ -82,7 +86,7 @@ export default async function Home() {
     description: featuredGames[0].description,
     slug: featuredGames[0].slug || generateSlug(featuredGames[0].title),
     image: featuredGames[0].image_url || '/placeholder-game.jpg',
-    year: new Date(featuredGames[0].created_at).getFullYear().toString(),
+    year: new Date(featuredGames[0].created_at).toLocaleString('default', { month: 'short' }) + ' ' + new Date(featuredGames[0].created_at).getFullYear(),
     rating: featuredGames[0].rating_average ? 
       `${Math.round(featuredGames[0].rating_average * 10) / 10}/5` : 
       "Not rated",
@@ -90,6 +94,24 @@ export default async function Home() {
       Math.round(featuredGames[0].rating_average * 10) / 10 : 
       undefined
   } : fallbackFeaturedGame;
+  
+  // Format featured games for the slider
+  const formattedFeaturedGames = featuredGames.length > 0 ? 
+    featuredGames.map(game => ({
+      id: game.id,
+      title: game.title,
+      description: game.description,
+      slug: game.slug || generateSlug(game.title),
+      image: game.image_url || '/placeholder-game.jpg',
+      year: new Date(game.created_at).getFullYear().toString(),
+      rating: game.rating_average ? 
+        `${Math.round(game.rating_average * 10) / 10}/5` : 
+        "Not rated",
+      rating_average: game.rating_average ? 
+        Math.round(game.rating_average * 10) / 10 : 
+        undefined
+    })) : 
+    [fallbackFeaturedGame];
   
   // Format games for carousel or use fallbacks if empty
   const formattedTopRatedGames = topRatedGames.length > 0 ? 
@@ -107,13 +129,21 @@ export default async function Home() {
   const formattedTrendingGames = trendingGames.length > 0 ?
     formatGamesForCarousel(trendingGames) :
     fallbackGames;
+    
+  const formattedMultiplayerGames = multiplayerGames.length > 0 ?
+    formatGamesForCarousel(multiplayerGames) :
+    fallbackGames;
   
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       
       <main className="flex-grow pt-16">
-        <HeroBanner {...featuredGame} />
+        {featuredGames.length > 1 ? (
+          <HeroBannerSlider featuredGames={formattedFeaturedGames} />
+        ) : (
+          <HeroBanner {...featuredGame} />
+        )}
         
         <div className="container mx-auto px-4 py-8">
           <GameCarousel 
@@ -138,6 +168,12 @@ export default async function Home() {
             title="📱 Mobile Games" 
             games={formattedMobileGames} 
             viewAllLink="/games?category=mobile"
+          />
+          
+          <GameCarousel 
+            title="👥 Multiplayer Games" 
+            games={formattedMultiplayerGames} 
+            viewAllLink="/games?category=multiplayer"
           />
           
           <BookmarkedGamesSection />

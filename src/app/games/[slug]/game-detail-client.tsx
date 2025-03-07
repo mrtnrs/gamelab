@@ -497,7 +497,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
           )}
           
           {/* Gallery - Always visible on desktop, conditionally on mobile */}
-          {(activeTab === 'gallery' || isDesktop) && (
+          {(activeTab === 'gallery' || isDesktop) && game.gallery && game.gallery.length > 0 && (
             <div className="mb-12 md:border-t md:border-border md:pt-12">
               <h2 className="text-2xl font-semibold mb-4">Gallery</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -627,8 +627,10 @@ export default function GameDetailClient({ slug }: { slug: string }) {
               title: g.title,
               slug: slug,
               image: imageUrl,
-              year: new Date(g.created_at).getFullYear().toString(),
-              rating: g.rating_average || 0
+              year: new Date(g.created_at).toLocaleString('default', { month: 'short' }) + ' ' + new Date(g.created_at).getFullYear(),
+              rating: g.rating_average || 0,
+              is_mobile_compatible: g.is_mobile_compatible,
+              is_multiplayer: g.is_multiplayer
             };
           })}
           viewAllLink="/games"

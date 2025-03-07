@@ -260,7 +260,9 @@ export default function GamesPage() {
               slug={generateSlug(game.title)}
               image={game.image_url}
               rating={game.rating_average}
-              year={new Date(game.created_at).getFullYear().toString()}
+              year={new Date(game.created_at).toLocaleString('default', { month: 'short' }) + ' ' + new Date(game.created_at).getFullYear()}
+              is_mobile_compatible={game.is_mobile_compatible}
+              is_multiplayer={game.is_multiplayer}
             />
           ))}
         </div>
@@ -280,13 +282,15 @@ export default function GamesPage() {
                 <div className="flex items-center text-sm text-foreground/70 mb-2">
                   <span className="capitalize">{game.developer}</span>
                   <span className="mx-2">•</span>
-                  <span>{new Date(game.created_at).getFullYear()}</span>
+                  <span>{new Date(game.created_at).toLocaleString('default', { month: 'short' })} {new Date(game.created_at).getFullYear()}</span>
                 </div>
-                <div className="flex items-center">
-                  <div className="bg-primary text-white text-xs px-2 py-1 rounded-full">
-                    {game.rating_average ? game.rating_average.toFixed(1) : 'N/A'}
+                {game.rating_average > 0 && (
+                  <div className="flex items-center">
+                    <div className="bg-primary text-white text-xs px-2 py-1 rounded-full">
+                      {game.rating_average.toFixed(1)}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           ))}

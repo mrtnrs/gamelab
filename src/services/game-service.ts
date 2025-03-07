@@ -76,7 +76,7 @@ export const gameService = {
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
         .select('id, name')
-        .eq('slug', categorySlug)
+        .ilike('slug', categorySlug)
         .single();
       
       if (categoryError || !categoryData) {
@@ -560,17 +560,46 @@ export const gameService = {
   
   async getAllCategories(): Promise<Category[]> {
     try {
-      const { data, error } = await supabase
+      // First get all categories
+      const { data: categories, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
         .order('name');
       
-      if (error) {
-        console.error('Error fetching all categories:', error);
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
         return [];
       }
       
-      return data || [];
+      // Get all published games to count them for each category
+      const { data: games, error: gamesError } = await supabase
+        .from('games')
+        .select('id, category, category_id')
+        .eq('status', 'published');
+      
+      if (gamesError) {
+        console.error('Error fetching games for category counts:', gamesError);
+        return categories || [];
+      }
+      
+      // Count games for each category (case-insensitive)
+      const categoriesWithCount = categories.map(category => {
+        const categoryName = category.name.toLowerCase();
+        
+        const count = games.filter(game => {
+          const matchesById = game.category_id === category.id;
+          const matchesByName = game.category && game.category.toLowerCase() === categoryName;
+          
+          return matchesById || matchesByName;
+        }).length;
+        
+        return {
+          ...category,
+          count
+        };
+      });
+      
+      return categoriesWithCount || [];
     } catch (error) {
       console.error('Error in getAllCategories:', error);
       return [];
