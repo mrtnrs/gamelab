@@ -9,7 +9,6 @@ export interface Game {
   developer_url?: string;
   created_at: string;
   updated_at?: string;
-  published: boolean;
   rating_average?: number;
   rating_count?: number;
   tags?: string[];

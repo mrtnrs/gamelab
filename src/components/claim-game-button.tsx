@@ -107,7 +107,7 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
     const authUrl = new URL('https://x.com/i/oauth2/authorize');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', process.env.NEXT_PUBLIC_X_CLIENT_ID!);
-    authUrl.searchParams.set('redirect_uri', `${window.location.origin}/auth/callback`);
+    authUrl.searchParams.set('redirect_uri', `${window.location.origin}/api/auth/x/callback`);
     authUrl.searchParams.set('scope', 'tweet.read users.read offline.access');
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('code_challenge', codeChallenge);

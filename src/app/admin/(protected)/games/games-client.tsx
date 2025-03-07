@@ -22,7 +22,6 @@ const fallbackGames: Game[] = [
     updated_at: '2023-05-15T00:00:00.000Z',
     featured: true,
     developer: 'Space Games Inc.',
-    published: true,
     tags: ['space', 'adventure'],
     is_multiplayer: false,
     is_mobile_compatible: true,
@@ -40,7 +39,6 @@ const fallbackGames: Game[] = [
     updated_at: '2023-05-10T00:00:00.000Z',
     featured: false,
     developer: 'Survival Studios',
-    published: true,
     tags: ['zombies', 'survival', 'action'],
   },
   {
@@ -55,7 +53,6 @@ const fallbackGames: Game[] = [
     updated_at: '2023-05-05T00:00:00.000Z',
     featured: false,
     developer: 'Fantasy Games',
-    published: false,
     tags: ['fantasy', 'rpg', 'adventure'],
   }
 ]

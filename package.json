@@ -17,10 +17,10 @@
     "@cloudflare/next-on-pages": "^1.13.8",
     "@supabase/ssr": "^0.0.10",
     "@supabase/supabase-js": "^2.49.1",
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "@types/crypto-js": "^4.2.2",
     "autoprefixer": "^10.0.1",
     "buffer": "^6.0.3",
     "crypto-js": "^4.2.0",
@@ -41,7 +41,5 @@
     "url": "^0.11.4",
     "vercel": "^35.0.0",
     "wrangler": "^3.22.1"
-  },
-  "devDependencies": {
   }
 }

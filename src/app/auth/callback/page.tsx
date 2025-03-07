@@ -1,3 +1,5 @@
+"use client"
+
 // pages/auth/callback.tsx
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
