@@ -6,8 +6,7 @@ export async function GET() {
   try {
     const redirectUrl = 'https://twitter.com/i/oauth2/authorize?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=https://gamelab.fun/api/auth/x/callback&scope=tweet.read+users.read&state=hardcoded-state&code_challenge=hardcoded-challenge&code_challenge_method=plain';
     const response = NextResponse.redirect(redirectUrl);
-    response.headers.append('Set-Cookie', 'x_auth_state=hardcoded-state');
-    response.headers.append('Set-Cookie', 'x_code_verifier=hardcoded-verifier');
+    response.cookies.set('x_auth_data', 'state=hardcoded-state;verifier=hardcoded-verifier');
     return response;
   } catch (error) {
     console.error('X auth error:', error);
