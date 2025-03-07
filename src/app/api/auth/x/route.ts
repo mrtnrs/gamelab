@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createHash, randomBytes } from 'crypto'
 
+export const runtime = 'edge';
 // X.com OAuth configuration
 // These would come from environment variables in production
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { gameService } from '@/services/game-service';
 import { cookies } from 'next/headers';
 
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest) {
   try {
     // Get the gameId from the query parameters
