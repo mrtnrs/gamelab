@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { xAuth } from '@/utils/x-auth'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-hot-toast'
 import { useSearchParams } from 'next/navigation'
 
@@ -13,31 +12,49 @@ interface ClaimGameButtonProps {
   onGameClaimed?: () => void
 }
 
+// Utility functions for PKCE (Proof Key for Code Exchange)
+const generateRandomString = (length: number) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint32Array(length)))
+    .map(x => characters[x % characters.length])
+    .join('');
+};
+
+const generateCodeChallenge = async (codeVerifier: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
 export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claimed, onGameClaimed }: ClaimGameButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const searchParams = useSearchParams()
-  
+
   // Check if the developer URL is an X.com URL
   const isXUrl = developerUrl && (
-    developerUrl.includes('twitter.com/') || 
+    developerUrl.includes('twitter.com/') ||
     developerUrl.includes('x.com/')
   )
-  
+
   // If it's not an X.com URL, don't render the button
   if (!isXUrl) {
     return null
   }
-  
+
   // Check for success/error messages in URL
   useEffect(() => {
     const success = searchParams.get('success')
     const error = searchParams.get('error')
-    
+
     // Only process if we have success or error params
     if (success || error) {
       if (success === 'game-claimed') {
         toast.success('Game claimed successfully!')
-        
+
         // Call the onGameClaimed callback if provided
         if (onGameClaimed) {
           onGameClaimed()
@@ -45,7 +62,7 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
       } else if (error) {
         let errorMessage = 'Failed to claim game'
         const decodedError = decodeURIComponent(error)
-        
+
         // Map error codes to user-friendly messages
         switch (decodedError) {
           case 'authentication-failed':
@@ -60,10 +77,10 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
           default:
             errorMessage = decodedError.replace(/-/g, ' ')
         }
-        
+
         toast.error(errorMessage)
       }
-      
+
       // Clear the URL parameters to prevent multiple toasts
       const url = new URL(window.location.href)
       url.searchParams.delete('success')
@@ -71,23 +88,41 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
       window.history.replaceState({}, '', url.toString())
     }
   }, [searchParams, onGameClaimed])
-  
-  const handleStartAuth = async () => {
+
+  const handleStartAuth = useCallback(async () => {
     // Store the game ID and slug in cookies for the API route
     document.cookie = `game_to_claim=${gameId}; path=/; max-age=1800;` // 30 minutes
     document.cookie = `game_to_claim_slug=${gameSlug}; path=/; max-age=1800;` // 30 minutes
-    
-    // Start the X.com authentication flow
-    await xAuth.startAuth()
-    
+
+    // Generate state and code_verifier for security
+    const state = generateRandomString(32);
+    const codeVerifier = generateRandomString(64);
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    // Store code_verifier securely for later use in token exchange
+    localStorage.setItem('code_verifier', codeVerifier);
+
+    // Build X.com authorization URL
+    const authUrl = new URL('https://x.com/i/oauth2/authorize');
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', process.env.NEXT_PUBLIC_X_CLIENT_ID!);
+    authUrl.searchParams.set('redirect_uri', `${window.location.origin}/auth/callback`);
+    authUrl.searchParams.set('scope', 'tweet.read users.read offline.access');
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('code_challenge', codeChallenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+
+    // Redirect user to X.com for authentication
+    window.location.href = authUrl.toString();
+
     // Close the modal
     setIsOpen(false)
-  }
-  
+  }, [gameId, gameSlug])
+
   const handleCloseModal = () => {
     setIsOpen(false)
   }
-  
+
   return (
     <>
       <button
@@ -97,24 +132,24 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
         <span className="h-6 w-6 text-[black] dark:text-[white] flex items-center justify-center">𝕏</span>
         <span>Claim Your Game</span>
       </button>
-      
+
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Claim Your Game</h2>
-              <button 
+              <button
                 onClick={handleCloseModal}
                 className="text-muted-foreground hover:text-foreground"
               >
-                &times;
+                ×
               </button>
             </div>
-            
+
             <p className="text-muted-foreground mb-6">
               Verify your ownership by authenticating with your X account. Your X handle must match the developer URL for this game.
             </p>
-            
+
             <div className="mb-6">
               <p className="mb-4 text-sm">
                 Click the button below to authenticate with X and verify your identity.
@@ -127,7 +162,7 @@ export default function ClaimGameButton({ gameId, gameSlug, developerUrl, claime
                 <span>Sign in with X</span>
               </button>
             </div>
-            
+
             <div className="flex justify-end">
               <button
                 onClick={handleCloseModal}
