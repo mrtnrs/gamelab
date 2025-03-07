@@ -6,28 +6,9 @@ export const runtime = 'edge';
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`;
 
-// Custom base64 encoding function
-function base64EncodeBytes(bytes: Uint8Array): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let base64 = '';
-  let i = 0;
-  while (i < bytes.length) {
-    const a = bytes[i++] || 0;
-    const b = bytes[i++] || 0;
-    const c = bytes[i++] || 0;
-    base64 += chars[a >> 2];
-    base64 += chars[((a & 3) << 4) | (b >> 4)];
-    base64 += b !== 0 ? chars[((b & 15) << 2) | (c >> 6)] : '=';
-    base64 += c !== 0 ? chars[c & 63] : '=';
-  }
-  return base64;
-}
-
 // Base64 URL encoding without btoa
 function base64URLEncode(str: string): string {
-  const bytes = new TextEncoder().encode(str);
-  const base64 = base64EncodeBytes(bytes);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // Helper function to generate random string
@@ -89,7 +70,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('X auth error:', error);
     return NextResponse.json(
-      { error: 'Authentication failed' },
+      { error: 'Authentication failed', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
