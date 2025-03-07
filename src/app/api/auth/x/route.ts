@@ -4,7 +4,8 @@ export const runtime = 'edge';
 
 export async function GET() {
   try {
-    return NextResponse.redirect('https://twitter.com');
+    const redirectUrl = 'https://twitter.com/i/oauth2/authorize?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=https://gamelab.fun/api/auth/x/callback&scope=tweet.read+users.read&state=hardcoded-state&code_challenge=hardcoded-challenge&code_challenge_method=plain';
+    return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error('X auth error:', error);
     return NextResponse.json(
