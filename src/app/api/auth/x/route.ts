@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
 export const runtime = 'edge';
+
 // X.com OAuth configuration
-// These would come from environment variables in production
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID
 const CLIENT_SECRET = process.env.X_CLIENT_SECRET
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`
 
-// Helper function to generate random string without crypto
+// Helper function to generate random string
 function generateRandomString(length: number): string {
   let result = '';
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -35,9 +35,6 @@ export async function GET(request: NextRequest) {
     
     // Generate code verifier and challenge for PKCE
     const codeVerifier = generateRandomString(64);
-    
-    // For code challenge, we'll use the verifier directly since we can't hash it easily
-    // This is not as secure as using SHA-256 but will work for testing
     const codeChallenge = base64encode(codeVerifier);
     
     // Store the state and code verifier in cookies
@@ -57,8 +54,12 @@ export async function GET(request: NextRequest) {
       path: '/'
     })
     
-    // Store the redirect URL after successful authentication
-    const redirectUrl = request.nextUrl.searchParams.get('redirect')
+    // Validate and construct redirect URL
+    const redirectParam = request.nextUrl.searchParams.get('redirect');
+    const redirectUrl = redirectParam && redirectParam.startsWith('/') 
+      ? redirectParam
+      : '/';
+
     if (redirectUrl) {
       await cookieStore.set('x_auth_redirect', redirectUrl, {
         httpOnly: true,
@@ -81,7 +82,13 @@ export async function GET(request: NextRequest) {
     // Redirect to X.com for authentication
     return NextResponse.redirect(authUrl.toString())
   } catch (error) {
-    console.error('Error starting X.com auth:', error)
+    console.error('Error starting X.com auth:', {
+      error,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV,
+      clientId: CLIENT_ID ? 'present' : 'missing',
+      redirectUri: REDIRECT_URI
+    });
     return NextResponse.json(
       { error: 'Failed to start authentication' },
       { status: 500 }
