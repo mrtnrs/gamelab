@@ -29,6 +29,15 @@ export interface CategoryFormData {
   description?: string;
 }
 
+// Changelog type definition
+export interface Changelog {
+  id: string;
+  title: string;
+  version: string;
+  date: string;
+  content: string;
+}
+
 export const gameService = {
   async getGames(): Promise<Game[]> {
     try {
@@ -232,6 +241,31 @@ export const gameService = {
       }
     } catch (error) {
       console.error('Error in getGameBySlug:', error);
+      return null;
+    }
+  },
+  
+  async getGameSlugById(id: string): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('title')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching game title:', error);
+        return null;
+      }
+      
+      if (!data || !data.title) {
+        return null;
+      }
+      
+      // Generate the slug from the title
+      return generateSlug(data.title);
+    } catch (error) {
+      console.error('Error in getGameSlugById:', error);
       return null;
     }
   },
@@ -989,6 +1023,290 @@ export const gameService = {
       return result;
     } catch (error) {
       console.error('Error in getSimilarGames:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Claims a game for a developer based on X.com handle
+   * @param gameId The ID of the game to claim
+   * @param xHandle The X.com handle of the developer (without @)
+   * @returns Success status and error if any
+   */
+  async claimGame(gameId: string, xHandle: string): Promise<{ success: boolean; error?: any }> {
+    try {
+      // First, get the game to check the developer_url
+      const { data: game, error: gameError } = await supabase
+        .from('games')
+        .select('developer_url, claimed')
+        .eq('id', gameId)
+        .single();
+      
+      if (gameError) {
+        console.error('Error fetching game for claiming:', gameError);
+        return { success: false, error: 'Game not found' };
+      }
+      
+      // Check if the game is already claimed
+      if (game.claimed) {
+        return { success: false, error: 'This game has already been claimed' };
+      }
+      
+      // Check if the developer_url contains the X handle
+      if (!game.developer_url || !game.developer_url.includes('x.com/')) {
+        return { 
+          success: false, 
+          error: 'This game does not have a valid X.com developer URL' 
+        };
+      }
+      
+      // Extract the handle from the developer_url
+      const urlParts = game.developer_url.split('/');
+      const developerHandle = urlParts[urlParts.length - 1];
+      
+      // Compare the handles (case insensitive)
+      if (developerHandle.toLowerCase() !== xHandle.toLowerCase()) {
+        return { 
+          success: false, 
+          error: 'Your X.com handle does not match the developer URL for this game' 
+        };
+      }
+      
+      // Update the game to mark it as claimed
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ claimed: true })
+        .eq('id', gameId);
+      
+      if (updateError) {
+        console.error('Error claiming game:', updateError);
+        return { success: false, error: 'Failed to claim game' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in claimGame:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+  
+  /**
+   * Adds a new changelog to a game
+   * @param gameId The ID of the game
+   * @param changelog The changelog to add
+   * @returns Success status and error if any
+   */
+  async addChangelog(
+    gameId: string, 
+    changelog: Omit<Changelog, 'id'>
+  ): Promise<{ success: boolean; changelogId?: string; error?: any }> {
+    try {
+      // First, get the current changelogs array
+      const { data: game, error: gameError } = await supabase
+        .from('games')
+        .select('changelogs, claimed')
+        .eq('id', gameId)
+        .single();
+      
+      if (gameError) {
+        console.error('Error fetching game for changelog:', gameError);
+        return { success: false, error: 'Game not found' };
+      }
+      
+      // Check if the game is claimed
+      if (!game.claimed) {
+        return { 
+          success: false, 
+          error: 'You must claim this game before adding changelogs' 
+        };
+      }
+      
+      // Generate a unique ID for the changelog
+      const changelogId = crypto.randomUUID();
+      
+      // Create the new changelog object
+      const newChangelog: Changelog = {
+        id: changelogId,
+        ...changelog
+      };
+      
+      // Get existing changelogs or initialize empty array
+      const existingChangelogs: Changelog[] = game.changelogs || [];
+      
+      // Add the new changelog to the array
+      const updatedChangelogs = [...existingChangelogs, newChangelog];
+      
+      // Update the game with the new changelogs array
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ changelogs: updatedChangelogs })
+        .eq('id', gameId);
+      
+      if (updateError) {
+        console.error('Error adding changelog:', updateError);
+        return { success: false, error: 'Failed to add changelog' };
+      }
+      
+      return { success: true, changelogId };
+    } catch (error) {
+      console.error('Error in addChangelog:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+  
+  /**
+   * Updates an existing changelog
+   * @param gameId The ID of the game
+   * @param changelogId The ID of the changelog to update
+   * @param changelog The updated changelog data
+   * @returns Success status and error if any
+   */
+  async updateChangelog(
+    gameId: string,
+    changelogId: string,
+    changelog: Partial<Omit<Changelog, 'id'>>
+  ): Promise<{ success: boolean; error?: any }> {
+    try {
+      // First, get the game and its changelogs
+      const { data: game, error: gameError } = await supabase
+        .from('games')
+        .select('changelogs, claimed')
+        .eq('id', gameId)
+        .single();
+      
+      if (gameError) {
+        console.error('Error fetching game for changelog update:', gameError);
+        return { success: false, error: 'Game not found' };
+      }
+      
+      // Check if the game is claimed
+      if (!game.claimed) {
+        return { 
+          success: false, 
+          error: 'You must claim this game before updating changelogs' 
+        };
+      }
+      
+      // Get existing changelogs or initialize empty array
+      const existingChangelogs: Changelog[] = game.changelogs || [];
+      
+      // Find the index of the changelog to update
+      const changelogIndex = existingChangelogs.findIndex(cl => cl.id === changelogId);
+      
+      // If changelog not found, return error
+      if (changelogIndex === -1) {
+        return { success: false, error: 'Changelog not found' };
+      }
+      
+      // Update the changelog
+      const updatedChangelogs = [...existingChangelogs];
+      updatedChangelogs[changelogIndex] = {
+        id: changelogId,
+        title: changelog.title || 'Untitled Update',
+        version: changelog.version || '0.0.0',
+        date: changelog.date || new Date().toISOString(),
+        content: changelog.content || 'No details provided'
+      };
+      
+      // Update the game with the modified changelogs array
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ changelogs: updatedChangelogs })
+        .eq('id', gameId);
+      
+      if (updateError) {
+        console.error('Error updating changelog:', updateError);
+        return { success: false, error: 'Failed to update changelog' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateChangelog:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+  
+  /**
+   * Deletes a changelog
+   * @param gameId The ID of the game
+   * @param changelogId The ID of the changelog to delete
+   * @returns Success status and error if any
+   */
+  async deleteChangelog(
+    gameId: string,
+    changelogId: string
+  ): Promise<{ success: boolean; error?: any }> {
+    try {
+      // First, get the game and its changelogs
+      const { data: game, error: gameError } = await supabase
+        .from('games')
+        .select('changelogs, claimed')
+        .eq('id', gameId)
+        .single();
+      
+      if (gameError) {
+        console.error('Error fetching game for changelog deletion:', gameError);
+        return { success: false, error: 'Game not found' };
+      }
+      
+      // Check if the game is claimed
+      if (!game.claimed) {
+        return { 
+          success: false, 
+          error: 'You must claim this game before deleting changelogs' 
+        };
+      }
+      
+      // Get existing changelogs or initialize empty array
+      const existingChangelogs: Changelog[] = game.changelogs || [];
+      
+      // Filter out the changelog to delete
+      const updatedChangelogs = existingChangelogs.filter(cl => cl.id !== changelogId);
+      
+      // If the arrays have the same length, the changelog wasn't found
+      if (updatedChangelogs.length === existingChangelogs.length) {
+        return { success: false, error: 'Changelog not found' };
+      }
+      
+      // Update the game with the filtered changelogs array
+      const { error: updateError } = await supabase
+        .from('games')
+        .update({ changelogs: updatedChangelogs })
+        .eq('id', gameId);
+      
+      if (updateError) {
+        console.error('Error deleting changelog:', updateError);
+        return { success: false, error: 'Failed to delete changelog' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteChangelog:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
+  },
+  
+  /**
+   * Gets all changelogs for a game
+   * @param gameId The ID of the game
+   * @returns Array of changelogs
+   */
+  async getChangelogs(gameId: string): Promise<Changelog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('games')
+        .select('changelogs')
+        .eq('id', gameId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching changelogs:', error);
+        return [];
+      }
+      
+      return data.changelogs || [];
+    } catch (error) {
+      console.error('Error in getChangelogs:', error);
       return [];
     }
   },

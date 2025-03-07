@@ -1,26 +1,35 @@
 export interface Game {
   id: string;
   title: string;
+  slug?: string;
   description: string;
-  image_url: string;
-  gallery_images?: string[];
-  category: string;
+  image_url?: string;
   url: string;
-  created_at: string;
-  updated_at: string;
-  featured: boolean;
   developer: string;
   developer_url?: string;
-  tags: string[];
-  status: 'published' | 'draft';
-  is_mobile_compatible?: boolean;
-  is_multiplayer?: boolean;
-  rating_count?: number;
-  rating_total?: number;
+  created_at: string;
+  updated_at?: string;
+  published: boolean;
   rating_average?: number;
+  rating_count?: number;
+  tags?: string[];
+  gallery_images?: string[];
+  is_multiplayer?: boolean;
+  is_mobile_compatible?: boolean;
   visit_count?: number;
-  slug?: string; // Added slug property
-  category_id?: string; // Added category_id property for consistency
+  claimed?: boolean;
+  changelogs?: Changelog[];
+  category?: string;
+  status?: string;
+  featured?: boolean;
+}
+
+export interface Changelog {
+  id: string;
+  title: string;
+  version: string;
+  date: string;
+  content: string;
 }
 
 export type GameFormData = Omit<Game, 'id' | 'created_at' | 'updated_at'> & {

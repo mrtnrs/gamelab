@@ -88,7 +88,7 @@ export default function GameForm({ gameId, initialData, isEditing }: GameFormPro
               is_mobile_compatible: game.is_mobile_compatible || false,
               is_multiplayer: game.is_multiplayer || false,
             });
-            setImagePreview(game.image_url);
+            setImagePreview(game.image_url || null);
             setGalleryPreviews(game.gallery_images || []);
           }
         } catch (error) {
@@ -236,6 +236,7 @@ export default function GameForm({ gameId, initialData, isEditing }: GameFormPro
         status: formData.status as 'published' | 'draft' || 'draft',
         is_mobile_compatible: !!formData.is_mobile_compatible,
         is_multiplayer: !!formData.is_multiplayer,
+        published: formData.status === 'published',
       };
 
       let result;

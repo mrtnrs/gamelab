@@ -7,7 +7,8 @@ import { FaMobileAlt, FaUsers } from 'react-icons/fa'
 import { useBookmarks } from '@/contexts/bookmark-context'
 import { generateSlug } from '@/utils/slug'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import VerifiedBadge from '@/components/verified-badge'
 
 interface GameCardProps {
   id: string
@@ -18,13 +19,19 @@ interface GameCardProps {
   year?: string
   is_mobile_compatible?: boolean
   is_multiplayer?: boolean
+  claimed?: boolean
 }
 
-export default function GameCard({ id, title, slug, image, rating, year, is_mobile_compatible, is_multiplayer }: GameCardProps) {
+export default function GameCard({ id, title, slug, image, rating, year, is_mobile_compatible, is_multiplayer, claimed }: GameCardProps) {
   const { isBookmarked, toggleBookmark } = useBookmarks()
   const router = useRouter()
   const bookmarked = isBookmarked(id)
   const [isHovered, setIsHovered] = useState(false)
+  
+  // Track if we're in a drag operation
+  const startPos = useRef({ x: 0, y: 0 })
+  const isDragging = useRef(false)
+  const clickTimer = useRef<NodeJS.Timeout | null>(null)
   
   // Normalize the slug using our utility function
   const safeSlug = slug || generateSlug(title || 'game')
@@ -35,25 +42,47 @@ export default function GameCard({ id, title, slug, image, rating, year, is_mobi
     toggleBookmark({ id, title, slug: safeSlug, image, year, rating })
   }
   
-  // Track mouse down position to detect drags
-  const [mouseDownPos, setMouseDownPos] = useState({ x: 0, y: 0 })
-  
   const handleMouseDown = (e: React.MouseEvent) => {
-    setMouseDownPos({ x: e.clientX, y: e.clientY })
+    startPos.current = { x: e.clientX, y: e.clientY }
+    isDragging.current = false
+    
+    // Set a timer to detect long press
+    if (clickTimer.current) clearTimeout(clickTimer.current)
+    clickTimer.current = setTimeout(() => {
+      isDragging.current = true // If held for 100ms, consider it a potential drag
+    }, 100)
   }
   
-  const handleCardClick = (e: React.MouseEvent) => {
-    e.preventDefault()
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) {
+      // Calculate distance moved
+      const dx = Math.abs(e.clientX - startPos.current.x)
+      const dy = Math.abs(e.clientY - startPos.current.y)
+      
+      // If moved more than threshold, consider it a drag
+      if (dx > 5 || dy > 5) {
+        isDragging.current = true
+        if (clickTimer.current) {
+          clearTimeout(clickTimer.current)
+          clickTimer.current = null
+        }
+      }
+    }
+  }
+  
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current)
+      clickTimer.current = null
+    }
     
-    // Calculate distance moved since mouse down
-    const dx = Math.abs(e.clientX - mouseDownPos.x)
-    const dy = Math.abs(e.clientY - mouseDownPos.y)
-    
-    // If mouse moved more than a small threshold, consider it a drag not a click
-    const dragThreshold = 5
-    if (dx <= dragThreshold && dy <= dragThreshold) {
+    // Only navigate if not dragging
+    if (!isDragging.current) {
+      e.preventDefault()
       router.push(`/games/${safeSlug}`)
     }
+    
+    isDragging.current = false
   }
   
   // Only show rating if it's greater than 0
@@ -61,14 +90,15 @@ export default function GameCard({ id, title, slug, image, rating, year, is_mobi
   
   return (
     <div 
-      onClick={handleCardClick}
       onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="relative rounded-md overflow-hidden transition-all duration-300 block cursor-pointer"
     >
       <div className="aspect-[2/3] md:aspect-[2/3] relative overflow-hidden rounded-md">
-        <div className="w-full h-[75%] md:h-full">
+        <div className="w-full h-full">
           <div className="relative w-full h-full overflow-hidden">
             <Image
               src={image}
@@ -112,8 +142,9 @@ export default function GameCard({ id, title, slug, image, rating, year, is_mobi
       
       <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex flex-col mb-1">
-          <h3 className="text-white font-semibold hover:text-primary transition-colors">
+          <h3 className="text-white font-semibold hover:text-primary transition-colors flex items-center space-x-1">
             {title}
+            {claimed && <VerifiedBadge />}
           </h3>
           
           {showRating && (
@@ -128,7 +159,7 @@ export default function GameCard({ id, title, slug, image, rating, year, is_mobi
                   return <FaRegStar key={i} className="text-yellow-400 w-3 h-3" />;
                 }
               })}
-              <span className="text-white hidden text-xs ml-1">{rating.toFixed(1)}</span>
+              <span className="text-white text-xs ml-1">{rating.toFixed(1)}</span>
             </div>
           )}
           

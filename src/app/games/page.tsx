@@ -258,7 +258,7 @@ export default function GamesPage() {
               id={game.id}
               title={game.title}
               slug={generateSlug(game.title)}
-              image={game.image_url}
+              image={game.image_url || '/placeholder-game.jpg'}
               rating={game.rating_average}
               year={new Date(game.created_at).toLocaleString('default', { month: 'short' }) + ' ' + new Date(game.created_at).getFullYear()}
               is_mobile_compatible={game.is_mobile_compatible}
@@ -272,7 +272,7 @@ export default function GamesPage() {
             <div key={game.id} className="flex bg-card border border-border rounded-md overflow-hidden">
               <div className="w-1/4 aspect-video relative">
                 <img
-                  src={game.image_url}
+                  src={game.image_url || '/placeholder-game.jpg'}
                   alt={game.title}
                   className="object-cover w-full h-full"
                 />

@@ -47,7 +47,7 @@ export async function generateMetadata(
       siteName: 'GameLab',
       images: [
         {
-          url: game.image_url,
+          url: game.image_url || '/placeholder-game.jpg',
           width: 1200,
           height: 630,
           alt: `Play ${game.title}`,
@@ -60,7 +60,7 @@ export async function generateMetadata(
       card: 'summary_large_image',
       title: `Play ${game.title} | GameLab`,
       description: `Play ${game.title} online for free. ${game.description.substring(0, 120)}`,
-      images: [game.image_url],
+      images: [game.image_url || '/placeholder-game.jpg'],
     },
     alternates: {
       canonical: canonicalUrl,

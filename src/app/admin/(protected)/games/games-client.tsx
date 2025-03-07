@@ -22,7 +22,11 @@ const fallbackGames: Game[] = [
     updated_at: '2023-05-15T00:00:00.000Z',
     featured: true,
     developer: 'Space Games Inc.',
+    published: true,
     tags: ['space', 'adventure'],
+    is_multiplayer: false,
+    is_mobile_compatible: true,
+    visit_count: 100,
   },
   {
     id: '2',
@@ -36,6 +40,7 @@ const fallbackGames: Game[] = [
     updated_at: '2023-05-10T00:00:00.000Z',
     featured: false,
     developer: 'Survival Studios',
+    published: true,
     tags: ['zombies', 'survival', 'action'],
   },
   {
@@ -45,12 +50,13 @@ const fallbackGames: Game[] = [
     status: 'draft',
     created_at: '2023-05-05T00:00:00.000Z',
     image_url: 'https://via.placeholder.com/150',
-    description: 'Embark on an epic fantasy quest.',
+    description: 'Embark on an epic fantasy adventure.',
     url: '#',
     updated_at: '2023-05-05T00:00:00.000Z',
     featured: false,
     developer: 'Fantasy Games',
-    tags: ['fantasy', 'rpg'],
+    published: false,
+    tags: ['fantasy', 'rpg', 'adventure'],
   }
 ]
 
@@ -83,8 +89,8 @@ function AdminGamesContent() {
   // Filter games based on search query and filters
   const filteredGames = games.filter((game) => {
     const matchesSearch = game.title.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || game.status.toLowerCase() === statusFilter.toLowerCase()
-    const matchesCategory = categoryFilter === 'all' || game.category.toLowerCase() === categoryFilter.toLowerCase()
+    const matchesStatus = statusFilter === 'all' || (game.status?.toLowerCase() === statusFilter.toLowerCase())
+    const matchesCategory = categoryFilter === 'all' || (game.category?.toLowerCase() === categoryFilter.toLowerCase())
     
     return matchesSearch && matchesStatus && matchesCategory
   })
@@ -116,7 +122,7 @@ function AdminGamesContent() {
   }
   
   // Get unique categories for filter
-  const categories = ['all', ...new Set(games.map((game) => game.category.toLowerCase()))]
+  const categories = ['all', ...new Set(games.map((game) => game.category?.toLowerCase() || 'uncategorized'))]
   
   return (
     <div className="container mx-auto px-4 py-8 mt-16">
@@ -248,7 +254,7 @@ function AdminGamesContent() {
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
                           : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                       }`}>
-                        {game.status.charAt(0).toUpperCase() + game.status.slice(1)}
+                        {(game.status?.charAt(0).toUpperCase() || '') + (game.status?.slice(1) || 'Unknown')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">

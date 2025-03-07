@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import GameCarousel from '@/components/game-carousel'
 import { GameStructuredData } from '@/components/structured-data'
 import { FiPlay, FiExternalLink, FiStar, FiSend } from 'react-icons/fi'
@@ -14,6 +15,9 @@ import { toast } from 'react-hot-toast'
 import { useBookmarks } from '@/contexts/bookmark-context'
 import { formatDistanceToNow } from 'date-fns'
 import { generateSlug } from '@/utils/slug'
+import ClaimGameButton from '@/components/claim-game-button'
+import ChangelogManager from '@/components/changelog-manager'
+import VerifiedBadge from '@/components/verified-badge'
 
 // Game carousel item type
 type GameCarouselItem = {
@@ -46,6 +50,7 @@ type FormattedGame = {
   is_multiplayer?: boolean;
   is_mobile_compatible?: boolean;
   visit_count: number;
+  claimed?: boolean;
 };
 
 // Function to convert a game object to a display-friendly format
@@ -73,7 +78,8 @@ const formatGameForDisplay = (game: Game): FormattedGame => {
     gallery: game.gallery_images || [imageUrl],
     is_multiplayer: game.is_multiplayer,
     is_mobile_compatible: game.is_mobile_compatible,
-    visit_count: game.visit_count || 0
+    visit_count: game.visit_count || 0,
+    claimed: game.claimed || false
   };
 };
 
@@ -97,6 +103,7 @@ export default function GameDetailClient({ slug }: { slug: string }) {
   const [similarGames, setSimilarGames] = useState<Game[]>([]);
   const [loadingSimilarGames, setLoadingSimilarGames] = useState(false);
   const commentTextRef = useRef<HTMLTextAreaElement>(null);
+  const searchParams = useSearchParams();
   
   // Check if user has already rated this game from localStorage
   useEffect(() => {
@@ -218,6 +225,21 @@ export default function GameDetailClient({ slug }: { slug: string }) {
     }
   }, [slug]);
   
+  // Effect to check for URL parameters
+  useEffect(() => {
+    // Check for error or success messages in URL
+    const error = searchParams.get('error');
+    const success = searchParams.get('success');
+    
+    if (error) {
+      toast.error(decodeURIComponent(error));
+    }
+    
+    if (success) {
+      toast.success(decodeURIComponent(success));
+    }
+  }, [searchParams]);
+  
   // Effect to handle responsive design
   useEffect(() => {
     // Check if we're on desktop
@@ -280,7 +302,10 @@ export default function GameDetailClient({ slug }: { slug: string }) {
         
         <div className="relative h-full container mx-auto px-4 flex flex-col justify-end pb-24">
           <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">{game.title}</h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-4xl md:text-6xl font-bold mb-4">{game.title}</h1>
+              {game.claimed && <VerifiedBadge className="h-6 w-6" />}
+            </div>
             
             <div className="flex items-center space-x-4 mb-4">
               {game.rating_average !== undefined && game.rating_average > 0 && (
@@ -359,14 +384,29 @@ export default function GameDetailClient({ slug }: { slug: string }) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Created by</p>
-                <a 
-                  href={game.creator.social_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground hover:text-primary transition-colors"
-                >
-                  {game.creator.name}
-                </a>
+                <div className="flex items-center space-x-2">
+                  <a 
+                    href={game.creator.social_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground hover:text-primary transition-colors"
+                  >
+                    {game.creator.name}
+                  </a>
+                  <ClaimGameButton 
+                    gameId={game.id} 
+                    gameSlug={game.slug}
+                    developerUrl={game.creator.social_link}
+                    claimed={game.claimed || false}
+                    onGameClaimed={() => {
+                      // Update local state to reflect the game is now claimed
+                      setGame(prev => prev ? {...prev, claimed: true} : null)
+                      
+                      // Show success message
+                      toast.success('Game claimed successfully! You can now add changelogs.')
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -428,6 +468,12 @@ export default function GameDetailClient({ slug }: { slug: string }) {
                     </span>
                   ))}
                 </div>
+                
+                {/* Changelog Manager */}
+                <ChangelogManager 
+                  gameId={game.id}
+                  claimed={game.claimed || false}
+                />
               </div>
               
               <div>

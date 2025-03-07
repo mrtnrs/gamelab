@@ -42,7 +42,6 @@ export default function GameCarousel({ title, games, viewAllLink, loading = fals
   const [showLeftButton, setShowLeftButton] = useState(false)
   const [showRightButton, setShowRightButton] = useState(true)
   const touchStartX = useRef(0)
-  const touchEndX = useRef(0)
   const isDragging = useRef(false)
   const dragDistance = useRef(0)
   
@@ -186,6 +185,11 @@ export default function GameCarousel({ title, games, viewAllLink, loading = fals
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
         >
           {loading ? (
             // Loading skeleton

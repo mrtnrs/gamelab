@@ -110,7 +110,7 @@ export default function GamePlayClient({ slug }: { slug: string }) {
           <div>
             <h3 className="text-sm font-medium text-muted-foreground">Tags</h3>
             <div className="flex flex-wrap gap-1 mt-1">
-              {game.tags.map((tag) => (
+              {game.tags?.map((tag) => (
                 <span key={tag} className="text-xs bg-muted px-2 py-1 rounded">
                   {tag}
                 </span>

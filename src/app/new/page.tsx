@@ -108,7 +108,7 @@ export default function NewAndPopularPage() {
               id={game.id}
               title={game.title}
               slug={generateSlug(game.title)}
-              image={game.image_url}
+              image={game.image_url || '/placeholder-game.jpg'}
               rating={game.rating_average}
               year={new Date(game.created_at).getFullYear().toString()}
             />

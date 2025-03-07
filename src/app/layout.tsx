@@ -1,10 +1,10 @@
-
 import type { Metadata } from "next";
 import { URL } from "url";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/components/auth-provider";
 import { BookmarkProvider } from "@/contexts/bookmark-context";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 const inter = Inter({
@@ -89,6 +89,7 @@ export default function RootLayout({
           <AuthProvider>
             <BookmarkProvider>
               {children}
+              <Toaster position="top-right" />
             </BookmarkProvider>
           </AuthProvider>
         </ThemeProvider>
