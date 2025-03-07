@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'react-hot-toast'
 import { useSearchParams } from 'next/navigation'
+import CryptoJS from 'crypto-js';
 
 interface ClaimGameButtonProps {
   gameId: string
@@ -14,18 +15,18 @@ interface ClaimGameButtonProps {
 
 // Utility functions for PKCE (Proof Key for Code Exchange)
 const generateRandomString = (length: number) => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from(crypto.getRandomValues(new Uint32Array(length)))
-    .map(x => characters[x % characters.length])
-    .join('');
+  const randomBytes = CryptoJS.lib.WordArray.random(length);
+  const randomString = randomBytes.toString(CryptoJS.enc.Base64)
+    .replace(/[^A-Za-z0-9]/g, '') // Remove special characters
+    .slice(0, length); // Trim to desired length
+  return randomString;
 };
 
 const generateCodeChallenge = async (codeVerifier: string) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-')
+  const hash = CryptoJS.SHA256(codeVerifier);
+  const base64 = hash.toString(CryptoJS.enc.Base64);
+  return base64
+    .replace(/\+/g, '-') // URL-safe Base64
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 };

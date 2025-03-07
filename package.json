@@ -22,6 +22,7 @@
     "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.0.1",
     "buffer": "^6.0.3",
+    "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "eslint": "^8",
     "eslint-config-next": "^15.2.0",
