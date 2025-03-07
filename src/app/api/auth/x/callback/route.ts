@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 
 export const runtime = 'edge';
+
 // X.com OAuth configuration
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID
 const CLIENT_SECRET = process.env.X_CLIENT_SECRET
@@ -15,10 +15,9 @@ export async function GET(request: NextRequest) {
     const state = request.nextUrl.searchParams.get('state')
     
     // Get the stored state and code verifier from cookies
-    const cookieStore = await cookies()
-    const storedState = cookieStore.get('x_auth_state')?.value
-    const codeVerifier = cookieStore.get('x_code_verifier')?.value
-    const redirectUrl = cookieStore.get('x_auth_redirect')?.value || '/'
+    const storedState = request.cookies.get('x_auth_state')?.value
+    const codeVerifier = request.cookies.get('x_code_verifier')?.value
+    const redirectUrl = request.cookies.get('x_auth_redirect')?.value || '/'
     
     // Validate the state to prevent CSRF attacks
     if (!state || !storedState || state !== storedState) {
@@ -32,14 +31,14 @@ export async function GET(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`
+        'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`
       },
       body: new URLSearchParams({
         code: code || '',
         grant_type: 'authorization_code',
         redirect_uri: REDIRECT_URI,
         code_verifier: codeVerifier || ''
-      })
+      }).toString()
     })
     
     if (!tokenResponse.ok) {
@@ -51,12 +50,11 @@ export async function GET(request: NextRequest) {
     }
     
     const tokenData = await tokenResponse.json()
-    const accessToken = tokenData.access_token
     
-    // Get the user's information
+    // Get the user information
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
       headers: {
-        Authorization: `Bearer ${accessToken}`
+        Authorization: `Bearer ${tokenData.access_token}`
       }
     })
     
@@ -69,35 +67,55 @@ export async function GET(request: NextRequest) {
     }
     
     const userData = await userResponse.json()
-    const userId = userData.data.id
-    const username = userData.data.username
+    const xHandle = userData.data.username
     
-    // Store the X.com handle in a cookie for the client
-    await cookieStore.set('x_handle', username, {
-      httpOnly: false, // Accessible from JavaScript
+    // Create response with redirect back to the app
+    const response = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_BASE_URL}${redirectUrl}`
+    );
+    
+    // Set the X handle in a cookie
+    response.cookies.set('x_handle', xHandle, {
+      httpOnly: false, // Make it accessible to client-side code
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 30, // 30 minutes
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/'
+    });
+    
+    // Check if we need to claim a game
+    const gameToClaimId = request.cookies.get('game_to_claim')?.value;
+    const gameToClaimSlug = request.cookies.get('game_to_claim_slug')?.value;
+    
+    if (gameToClaimId && gameToClaimSlug) {
+      // Redirect to the claim-game API instead of the original page
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/api/claim-game?gameId=${gameToClaimId}&gameSlug=${gameToClaimSlug}`);
+    }
+    
+    // Remove the state and code verifier cookies
+    response.cookies.set('x_auth_state', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
       path: '/'
     })
     
-    // Clear the auth cookies
-    await cookieStore.delete('x_auth_state')
-    await cookieStore.delete('x_code_verifier')
-    await cookieStore.delete('x_auth_redirect')
+    response.cookies.set('x_code_verifier', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
+      path: '/'
+    })
     
-    // Check if we need to claim a game
-    const gameToClaimId = request.cookies.get('game_to_claim')?.value
-    const gameToClaimSlug = request.cookies.get('game_to_claim_slug')?.value
+    response.cookies.set('x_auth_redirect', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
+      path: '/'
+    })
     
-    if (gameToClaimId && gameToClaimSlug) {
-      // Redirect to the claim-game API
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/api/claim-game?gameId=${gameToClaimId}&gameSlug=${gameToClaimSlug}`)
-    }
-    
-    // Redirect back to the original page
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}${redirectUrl}`)
+    return response
   } catch (error) {
-    console.error('Error in X.com callback:', error)
+    console.error('X auth callback error:', error)
     return NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_BASE_URL}/auth-error?error=unexpected_error`
     )

@@ -1,26 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
 // X.com OAuth configuration
-const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID
-const CLIENT_SECRET = process.env.X_CLIENT_SECRET
-const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`
+const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`;
 
 // Helper function to generate random string
 function generateRandomString(length: number): string {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const charactersLength = characters.length;
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    result += charset.charAt(randomIndex);
   }
   return result;
 }
 
-// Simple base64 encoding function
-function base64encode(str: string): string {
+// Simple base64 encoding function compatible with Edge
+function base64URLEncode(str: string): string {
   return btoa(str)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -30,68 +28,53 @@ function base64encode(str: string): string {
 // Start X.com OAuth flow
 export async function GET(request: NextRequest) {
   try {
-    // Generate a random state for CSRF protection
+    // Generate state for CSRF protection
     const state = generateRandomString(32);
     
-    // Generate code verifier and challenge for PKCE
+    // Generate code verifier for PKCE
     const codeVerifier = generateRandomString(64);
-    const codeChallenge = base64encode(codeVerifier);
     
-    // Store the state and code verifier in cookies
-    const cookieStore = await cookies()
+    // For code challenge, use the verifier directly with base64 encoding
+    const codeChallenge = base64URLEncode(codeVerifier);
     
-    await cookieStore.set('x_auth_state', state, { 
-      httpOnly: true, 
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 10, // 10 minutes
-      path: '/'
-    })
+    // Get redirect path from query parameters or default to home
+    const redirectPath = request.nextUrl.searchParams.get('redirect') || '/';
     
-    await cookieStore.set('x_code_verifier', codeVerifier, {
+    // Create response with redirect to X.com OAuth
+    const response = NextResponse.redirect(
+      `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=tweet.read+users.read&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=plain`
+    );
+    
+    // Set cookies with state, code verifier and redirect path
+    response.cookies.set('x_auth_state', state, { 
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 10, // 10 minutes
       path: '/'
-    })
+    });
     
-    // Validate and construct redirect URL
-    const redirectParam = request.nextUrl.searchParams.get('redirect');
-    const redirectUrl = redirectParam && redirectParam.startsWith('/') 
-      ? redirectParam
-      : '/';
-
-    if (redirectUrl) {
-      await cookieStore.set('x_auth_redirect', redirectUrl, {
+    response.cookies.set('x_code_verifier', codeVerifier, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 10, // 10 minutes
+      path: '/'
+    });
+    
+    if (redirectPath) {
+      response.cookies.set('x_auth_redirect', redirectPath, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 10, // 10 minutes
         path: '/'
-      })
+      });
     }
     
-    // Build the X.com OAuth URL
-    const authUrl = new URL('https://twitter.com/i/oauth2/authorize')
-    authUrl.searchParams.append('response_type', 'code')
-    authUrl.searchParams.append('client_id', CLIENT_ID || '')
-    authUrl.searchParams.append('redirect_uri', REDIRECT_URI)
-    authUrl.searchParams.append('scope', 'tweet.read users.read')
-    authUrl.searchParams.append('state', state)
-    authUrl.searchParams.append('code_challenge', codeChallenge)
-    authUrl.searchParams.append('code_challenge_method', 'plain')
-    
-    // Redirect to X.com for authentication
-    return NextResponse.redirect(authUrl.toString())
+    return response;
   } catch (error) {
-    console.error('Error starting X.com auth:', {
-      error,
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      clientId: CLIENT_ID ? 'present' : 'missing',
-      redirectUri: REDIRECT_URI
-    });
+    console.error('X auth error:', error);
     return NextResponse.json(
-      { error: 'Failed to start authentication' },
+      { error: 'Authentication failed' },
       { status: 500 }
-    )
+    );
   }
 }
