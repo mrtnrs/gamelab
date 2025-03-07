@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // X.com OAuth configuration
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Prepare the Authorization header using btoa (simplified from custom base64)
-    const authBase64 = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
+    const authBase64 = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
 
     // Exchange the code for an access token
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
