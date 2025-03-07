@@ -29,7 +29,7 @@ export async function generateMetadata(
   }
 
   const keywords = game.tags?.join(', ') || '';
-  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://gamelab.example.com'}/games/${slug}`;
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://gamelab.fun'}/games/${slug}`;
 
   return {
     title: `${game.title} | Play on GameLab`,
@@ -42,7 +42,7 @@ export async function generateMetadata(
       siteName: 'GameLab',
       images: [
         {
-          url: game.image_url || '/placeholder-game.jpg',
+          url: game.image_url,
           width: 1200,
           height: 630,
           alt: game.title,
@@ -55,7 +55,7 @@ export async function generateMetadata(
       card: 'summary_large_image',
       title: `${game.title} | Play on GameLab`,
       description: game.description.substring(0, 160),
-      images: [game.image_url || '/placeholder-game.jpg'],
+      images: [game.image_url],
     },
     alternates: {
       canonical: canonicalUrl,
