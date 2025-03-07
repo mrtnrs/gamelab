@@ -42,7 +42,7 @@ export async function generateMetadata(
       siteName: 'GameLab',
       images: [
         {
-          url: game.image_url,
+          url: game.image_url || '/placeholder-game.jpg',
           width: 1200,
           height: 630,
           alt: game.title,
@@ -55,7 +55,7 @@ export async function generateMetadata(
       card: 'summary_large_image',
       title: `${game.title} | Play on GameLab`,
       description: game.description.substring(0, 160),
-      images: [game.image_url],
+      images: [game.image_url || '/placeholder-game.jpg'],
     },
     alternates: {
       canonical: canonicalUrl,
