@@ -1,14 +1,16 @@
-// pages/api/exchange-token.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+export async function POST(request: NextRequest) {
+  // Ensure the request method is POST
+  if (request.method !== 'POST') {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
-  const { code, state } = req.body;
+  // Parse the request body
+  const body = await request.json();
+  const { code, state, code_verifier } = body;
 
   // In a production app, verify the state parameter against a stored value
 
@@ -23,12 +25,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       code: code as string,
       grant_type: 'authorization_code',
       redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-      code_verifier: localStorage.getItem('code_verifier') || '', // Retrieve from client-side storage
+      code_verifier: code_verifier || '', // Expect code_verifier to be sent from the client
     }).toString(),
   });
 
   if (!tokenResponse.ok) {
-    return res.status(400).json({ error: 'Failed to exchange code for token' });
+    return NextResponse.json({ error: 'Failed to exchange code for token' }, { status: 400 });
   }
 
   const tokenData = await tokenResponse.json();
@@ -40,18 +42,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   if (!userResponse.ok) {
-    return res.status(400).json({ error: 'Failed to fetch user data' });
+    return NextResponse.json({ error: 'Failed to fetch user data' }, { status: 400 });
   }
 
   const userData = await userResponse.json();
   const xHandle = userData.data.username;
 
   // Verify the handle matches the game’s developer handle
-  const gameDeveloperHandle = 'expected_handle'; // Replace with logic to fetch the game’s developer handle
+  const gameDeveloperHandle = 'expected_handle'; // Replace with actual logic to fetch the game’s developer handle
   if (xHandle !== gameDeveloperHandle) {
-    return res.status(403).json({ error: 'Unauthorized: Handle does not match game developer' });
+    return NextResponse.json({ error: 'Unauthorized: Handle does not match game developer' }, { status: 403 });
   }
 
   // Success: Return the access token to the client
-  res.status(200).json({ success: true, access_token: accessToken });
+  return NextResponse.json({ success: true, access_token: accessToken }, { status: 200 });
 }
