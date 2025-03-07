@@ -284,7 +284,7 @@ export default function GamesPage() {
                   <span className="mx-2">•</span>
                   <span>{new Date(game.created_at).toLocaleString('default', { month: 'short' })} {new Date(game.created_at).getFullYear()}</span>
                 </div>
-                {game.rating_average > 0 && (
+                {game.rating_average !== undefined && game.rating_average > 0 && (
                   <div className="flex items-center">
                     <div className="bg-primary text-white text-xs px-2 py-1 rounded-full">
                       {game.rating_average.toFixed(1)}
