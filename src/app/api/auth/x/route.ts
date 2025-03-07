@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createHash, randomBytes } from 'crypto'
 
 export const runtime = 'edge';
 // X.com OAuth configuration
@@ -9,20 +8,37 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID
 const CLIENT_SECRET = process.env.X_CLIENT_SECRET
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`
 
+// Helper function to generate random string
+async function generateRandomString(length: number): Promise<string> {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Helper function to create base64url encoded SHA-256 hash
+async function createSHA256Hash(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashBase64 = btoa(String.fromCharCode(...hashArray));
+  
+  // Convert base64 to base64url format
+  return hashBase64
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 // Start X.com OAuth flow
 export async function GET(request: NextRequest) {
   try {
     // Generate a random state for CSRF protection
-    const state = randomBytes(16).toString('hex')
+    const state = await generateRandomString(16);
     
     // Generate code verifier and challenge for PKCE
-    const codeVerifier = randomBytes(32).toString('hex')
-    const codeChallenge = createHash('sha256')
-      .update(codeVerifier)
-      .digest('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '')
+    const codeVerifier = await generateRandomString(32);
+    const codeChallenge = await createSHA256Hash(codeVerifier);
     
     // Store the state and code verifier in cookies
     const cookieStore = await cookies()
