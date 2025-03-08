@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
     
     if (!gameSlug) {
       // Fallback to fetching the slug if it's not provided in the URL
-      const fetchedGameSlug = await gameService.getGameSlugById(gameId);
+     // const fetchedGameSlug = await gameService.getGameSlugById(gameId);
       
-      if (!fetchedGameSlug) {
-        return NextResponse.redirect(new URL('/?error=game-not-found', request.url));
-      }
+      // if (!fetchedGameSlug) {
+      //   return NextResponse.redirect(new URL('/?error=game-not-found', request.url));
+      // }
       
-      gameSlug = fetchedGameSlug;
+      // gameSlug = fetchedGameSlug;
     }
     
     // Get the X handle from the cookies
@@ -35,16 +35,18 @@ export async function GET(request: NextRequest) {
     }
     
     // Call the game service to claim the game
-    const result = await gameService.claimGame(gameId, xHandle);
+    // const result = await gameService.claimGame(gameId, xHandle);
+    const result = "hello";
     
-    if (result.success) {
-      // Success - redirect to the game page with success message
-      return NextResponse.redirect(new URL(`/games/${gameSlug}?success=game-claimed`, request.url));
-    } else {
+    // if (result.success) {
+    //   // Success - redirect to the game page with success message
+    //   return NextResponse.redirect(new URL(`/games/${gameSlug}?success=game-claimed`, request.url));
+    // } else {
       // Failed - redirect to the game page with error message
-      const errorParam = encodeURIComponent(result.error || 'unknown-error');
-      return NextResponse.redirect(new URL(`/games/${gameSlug}?error=${errorParam}`, request.url));
-    }
+       // const errorParam = encodeURIComponent(result.error || 'unknown-error');
+      const errorParam = encodeURIComponent('unknown-error');
+       return NextResponse.redirect(new URL(`/games/${gameSlug}?error=${errorParam}`, request.url));
+
   } catch (error) {
     console.error('Error in claim-game API:', error);
     return NextResponse.redirect(new URL('/?error=server-error', request.url));
