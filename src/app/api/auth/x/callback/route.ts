@@ -1,64 +1,78 @@
+// src/app/api/auth/x/callback/route.ts
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = 'edge';
+export const runtime = "edge";
 
-// X.com OAuth configuration
+// Simple base64 encoder (no btoa)
+const toBase64 = (str: string): string => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let result = "";
+  let bytes = new TextEncoder().encode(str);
+  let i = 0;
+
+  while (i < bytes.length) {
+    const b1 = bytes[i++];
+    const b2 = i < bytes.length ? bytes[i++] : 0;
+    const b3 = i < bytes.length ? bytes[i++] : 0;
+
+    const enc1 = b1 >> 2;
+    const enc2 = ((b1 & 3) << 4) | (b2 >> 4);
+    const enc3 = ((b2 & 15) << 2) | (b3 >> 6);
+    const enc4 = b3 & 63;
+
+    result += chars[enc1] + chars[enc2];
+    result += b2 ? chars[enc3] : "=";
+    result += b3 ? chars[enc4] : "=";
+  }
+  return result;
+};
+
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-const CLIENT_SECRET = process.env.X_CLIENT_SECRET; // Ensure this is set in your .env
+const CLIENT_SECRET = process.env.X_CLIENT_SECRET;
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`;
 
 export async function GET(req: NextRequest) {
   try {
-    // Get the cookie store
     const cookieStore = await cookies();
-
-    // Retrieve cookie values
     const gameId = cookieStore.get("auth_game_id")?.value;
     const gameSlug = cookieStore.get("auth_game_slug")?.value;
-    const codeVerifier = cookieStore.get("auth_code_verifier")?.value;
     const storedState = cookieStore.get("auth_state")?.value;
 
-    // Extract query parameters
     const { searchParams } = new URL(req.url);
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const error = searchParams.get("error");
 
-    // **Step 1: Validate Session and Cookies**
-    if (!gameId || !gameSlug || !codeVerifier || !storedState) {
-      return NextResponse.redirect(
-        `${req.nextUrl.origin}/error?message=session-expired`
-      );
+    if (!gameId || !gameSlug || !storedState) {
+      return NextResponse.redirect(`${req.nextUrl.origin}/error?message=session-expired`);
     }
 
-    // **Step 2: Validate State (CSRF Protection)**
     if (!state || state !== storedState) {
-      return NextResponse.redirect(
-        `${req.nextUrl.origin}/error?message=invalid-state`
-      );
+      return NextResponse.redirect(`${req.nextUrl.origin}/error?message=invalid-state`);
     }
 
-    // **Step 3: Handle Authentication Errors from X.com**
     if (error || !code) {
       return NextResponse.redirect(
         `${req.nextUrl.origin}/games/${gameSlug}?error=authentication-failed`
       );
     }
 
-    // **Step 4: Exchange Authorization Code for Access Token**
+    // Manual base64 encoding for Authorization header
+    const authString = `${CLIENT_ID}:${CLIENT_SECRET}`;
+    const base64Auth = toBase64(authString);
+
     const tokenResponse = await fetch("https://api.x.com/2/oauth2/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
+        Authorization: `Basic ${base64Auth}`,
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
         redirect_uri: REDIRECT_URI,
         client_id: CLIENT_ID!,
-        code_verifier: codeVerifier,
       }).toString(),
     });
 
@@ -73,7 +87,6 @@ export async function GET(req: NextRequest) {
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    // **Step 5: Fetch User Profile**
     const userResponse = await fetch("https://api.x.com/2/users/me", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -91,23 +104,18 @@ export async function GET(req: NextRequest) {
     const userData = await userResponse.json();
     const handle = userData.data.username;
 
-    // **Step 6: Verify User's X Handle**
-    // TODO: Replace this with your actual logic to determine the expected handle
-    const expectedHandle = "someDeveloperHandle"; // Example; fetch from DB or config
+    const expectedHandle = "someDeveloperHandle";
     if (handle !== expectedHandle) {
       return NextResponse.redirect(
         `${req.nextUrl.origin}/games/${gameSlug}?error=handle-mismatch`
       );
     }
 
-    // **Step 7: Success - Redirect to Game Page**
     const response = NextResponse.redirect(
       `${req.nextUrl.origin}/games/${gameSlug}?success=game-claimed`
     );
 
-    // Clean up temporary cookies
     response.cookies.set("auth_state", "", { maxAge: 0 });
-    response.cookies.set("auth_code_verifier", "", { maxAge: 0 });
     response.cookies.set("auth_game_id", "", { maxAge: 0 });
     response.cookies.set("auth_game_slug", "", { maxAge: 0 });
 
