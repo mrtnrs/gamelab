@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 // X.com OAuth configuration
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
 const CLIENT_SECRET = process.env.X_CLIENT_SECRET; // Ensure this is set in your .env

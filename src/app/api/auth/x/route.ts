@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import CryptoJS from "crypto-js";
 
+export const runtime = 'edge';
+
 // Helper function to generate a random string
 const generateRandomString = (length: number) => {
   const randomBytes = CryptoJS.lib.WordArray.random(length);
