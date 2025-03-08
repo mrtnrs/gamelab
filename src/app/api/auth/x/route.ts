@@ -1,65 +1,78 @@
-import { NextRequest, NextResponse } from 'next/server';
+// src/app/api/auth/x/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import CryptoJS from "crypto-js";
 
-export const runtime = 'edge';
+// Helper function to generate a random string
+const generateRandomString = (length: number) => {
+  const randomBytes = CryptoJS.lib.WordArray.random(length);
+  return randomBytes.toString(CryptoJS.enc.Hex);
+};
 
-// X.com OAuth configuration
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/x/callback`;
 
-// Simple function to generate random string for Edge compatibility
-function generateRandomString(length: number): string {
-  let result = '';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
+export async function GET(req: NextRequest) {
+  if (!CLIENT_ID) {
+    return NextResponse.json({ error: "Client ID is not configured." }, { status: 500 });
   }
-  return result;
-}
 
-export async function GET(request: NextRequest) {
-  try {
-    // Generate a simple random state for CSRF protection
-    const state = generateRandomString(32);
-    
-    // For simplicity, we'll use the same string for verifier and challenge
-    const codeVerifier = generateRandomString(64);
-    const codeChallenge = codeVerifier;
-    
-    // Get redirect path
-    const redirectPath = request.nextUrl.searchParams.get('redirect') || '/';
-    
-    // Build the OAuth URL manually to avoid any issues
-    const authUrl = 'https://twitter.com/i/oauth2/authorize' +
-      '?response_type=code' +
-      '&client_id=' + encodeURIComponent(CLIENT_ID || '') +
-      '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
-      '&scope=' + encodeURIComponent('tweet.read users.read') +
-      '&state=' + encodeURIComponent(state) +
-      '&code_challenge=' + encodeURIComponent(codeChallenge) +
-      '&code_challenge_method=plain';
-    
-    // Create response with redirect
-    const response = NextResponse.redirect(authUrl);
-    
-    // Set cookies with minimal options
-    response.cookies.set('x_auth_state', state, { 
-      path: '/',
-      maxAge: 600 // 10 minutes
-    });
-    
-    response.cookies.set('x_code_verifier', codeVerifier, {
-      path: '/',
-      maxAge: 600 // 10 minutes
-    });
-    
-    response.cookies.set('x_auth_redirect', redirectPath, {
-      path: '/',
-      maxAge: 600 // 10 minutes
-    });
-    
-    return response;
-  } catch (error) {
-    console.error('X auth error:', error);
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+  const { searchParams } = new URL(req.url);
+  const gameId = searchParams.get("gameId");
+  const gameSlug = searchParams.get("gameSlug");
+
+  if (!gameId || !gameSlug) {
+    return NextResponse.json({ error: "Missing gameId or gameSlug" }, { status: 400 });
   }
+
+  // Generate state for CSRF protection
+  const state = generateRandomString(16); // 16 bytes = 32 hex characters
+
+  // Generate PKCE parameters
+  const codeVerifier = generateRandomString(32);
+  const codeChallenge = CryptoJS.SHA256(codeVerifier)
+    .toString(CryptoJS.enc.Base64)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  // Build X.com OAuth 2.0 authorization URL
+  const authUrl = new URL("https://x.com/i/oauth2/authorize");
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("client_id", CLIENT_ID);
+  authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
+  authUrl.searchParams.set("scope", "tweet.read users.read");
+  authUrl.searchParams.set("state", state); // Add the state parameter
+  authUrl.searchParams.set("code_challenge", codeChallenge);
+  authUrl.searchParams.set("code_challenge_method", "S256");
+
+  // Prepare the redirect response
+  const response = NextResponse.redirect(authUrl);
+
+  // Set cookies for state, codeVerifier, gameId, and gameSlug
+  response.cookies.set("auth_state", state, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 1800, // 30 minutes
+    sameSite: "lax",
+  });
+  response.cookies.set("auth_code_verifier", codeVerifier, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 1800,
+    sameSite: "lax",
+  });
+  response.cookies.set("auth_game_id", gameId, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 1800,
+    sameSite: "lax",
+  });
+  response.cookies.set("auth_game_slug", gameSlug, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 1800,
+    sameSite: "lax",
+  });
+
+  return response;
 }
