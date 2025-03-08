@@ -1,13 +1,27 @@
 // src/app/api/auth/x/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import CryptoJS from "crypto-js";
 
-export const runtime = 'edge';
+export const runtime = "edge";
 
-// Helper function to generate a random string
-const generateRandomString = (length: number) => {
-  const randomBytes = CryptoJS.lib.WordArray.random(length);
-  return randomBytes.toString(CryptoJS.enc.Hex);
+// Helper function to generate a random string using Web Crypto
+const generateRandomString = async (length: number): Promise<string> => {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, length); // Ensure exact length
+};
+
+// Helper function to generate SHA-256 hash for PKCE code challenge
+const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 };
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
@@ -26,16 +40,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing gameId or gameSlug" }, { status: 400 });
   }
 
-  // Generate state for CSRF protection
-  const state = generateRandomString(16); // 16 bytes = 32 hex characters
+  // Generate state for CSRF protection (32 hex chars = 16 bytes)
+  const state = await generateRandomString(32);
 
   // Generate PKCE parameters
-  const codeVerifier = generateRandomString(32);
-  const codeChallenge = CryptoJS.SHA256(codeVerifier)
-    .toString(CryptoJS.enc.Base64)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  const codeVerifier = await generateRandomString(64); // 32 bytes = 64 hex chars
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
 
   // Build X.com OAuth 2.0 authorization URL
   const authUrl = new URL("https://x.com/i/oauth2/authorize");
@@ -43,7 +53,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set("client_id", CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
   authUrl.searchParams.set("scope", "tweet.read users.read");
-  authUrl.searchParams.set("state", state); // Add the state parameter
+  authUrl.searchParams.set("state", state);
   authUrl.searchParams.set("code_challenge", codeChallenge);
   authUrl.searchParams.set("code_challenge_method", "S256");
 
