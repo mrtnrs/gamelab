@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 // Define the correct types for Next.js 15
 type Props = {
-  params: {};
+  params: Promise<{}>;
   searchParams: Promise<{
     code?: string | string[];
     state?: string | string[];
@@ -12,8 +12,9 @@ type Props = {
   }>;
 };
 
-export default async function XAuthCallbackPage({ searchParams }: Props) {
-  // Await the searchParams Promise in Next.js 15
+export default async function XAuthCallbackPage({ params, searchParams }: Props) {
+  // Await the params and searchParams Promises in Next.js 15
+  await params;
   const resolvedSearchParams = await searchParams;
   
   // Handle search parameters (Next.js 15 may return arrays for multi-value params)
