@@ -45,11 +45,15 @@ export type AuthResult = {
   error?: string;
   gameSlug?: string;
   developerHandle?: string;
+  tokenError?: string;
+  userInfoError?: string;
 };
 
 export type CallbackResult = {
-  redirect?: string;
   error?: string;
+  redirect?: string;
+  errorDetails?: any;
+  errorType?: string;
 };
 
 /**
@@ -158,104 +162,120 @@ async function exchangeTokenWithRetry(
  * Handle X.com OAuth callback
  */
 export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
-  const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-  const CLIENT_SECRET = process.env.X_CLIENT_SECRET;
-  const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-
   try {
-    // Get the cookies store and await it
-    const cookieStore = await cookies();
-    
-    const storedState = cookieStore.get('x_auth_state')?.value;
-    const codeVerifier = cookieStore.get('x_code_verifier')?.value;
-    const gameId = cookieStore.get('game_to_claim')?.value;
-    const gameSlug = cookieStore.get('game_to_claim_slug')?.value;
-
-    if (!storedState || !codeVerifier) {
-      console.error('Missing stored state or code verifier');
-      return { success: false, error: 'missing_cookies' };
-    }
-
-    if (state !== storedState) {
-      console.error('Invalid state parameter');
+    // Parse state to extract original state, gameId, and gameSlug
+    const [storedState, gameId, gameSlug] = state.split('|');
+    if (!storedState) {
+      console.error('Invalid state format:', state);
       return { success: false, error: 'invalid_state' };
     }
 
-    const tokenData = await exchangeTokenWithRetry(code, codeVerifier, REDIRECT_URI);
+    // Retrieve codeVerifier and state from cookies
+    const cookieStore = await cookies();
+    const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
+    const storedStateCookie = cookieStore.get('x_auth_state')?.value;
 
+    // Validate cookies and state
+    if (!storedCodeVerifier || !storedStateCookie) {
+      console.error('Missing cookies:', { storedCodeVerifier, storedStateCookie });
+      return { success: false, error: 'missing_cookies' };
+    }
+
+    if (storedStateCookie !== storedState) {
+      console.error('State mismatch:', { storedStateCookie, storedState });
+      return { success: false, error: 'invalid_state' };
+    }
+
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(
+          `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
+        ).toString('base64')}`,
+      },
+      body: new URLSearchParams({
+        code,
+        grant_type: 'authorization_code',
+        client_id: process.env.TWITTER_CLIENT_ID || '',
+        redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+        code_verifier: storedCodeVerifier,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      let tokenError;
+      try {
+        // Try to parse the error as JSON
+        tokenError = JSON.parse(errorText);
+      } catch (e) {
+        // If it's not valid JSON, use the raw text
+        tokenError = errorText;
+      }
+      
+      console.error('Token exchange error:', tokenError);
+      return { 
+        success: false, 
+        error: 'token_exchange_failed',
+        tokenError: typeof tokenError === 'object' ? JSON.stringify(tokenError) : String(tokenError)
+      };
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Get user info
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.error('User info error:', errorText);
-      return { success: false, error: 'user_info_failed' };
+      return { success: false, error: 'user_info_failed', userInfoError: errorText };
     }
 
     const userData = await userResponse.json();
-    console.log('X.com user data:', JSON.stringify(userData, null, 2));
-
+    const xId = userData.data.id;
     const xHandle = userData.data.username;
-    const xUserId = userData.data.id;
 
-    // Clear cookies
-    cookieStore.set('x_auth_state', '', { maxAge: 0, path: '/' });
-    cookieStore.set('x_code_verifier', '', { maxAge: 0, path: '/' });
-
+    // If gameId is provided, attempt to claim the game
     if (gameId && gameSlug) {
-      cookieStore.set('game_to_claim', '', { maxAge: 0, path: '/' });
-      cookieStore.set('game_to_claim_slug', '', { maxAge: 0, path: '/' });
+      const claimResult = await claimGame(gameId, xId, xHandle);
       
-      // Attempt to claim the game
-      const claimResult = await claimGame(gameId, xHandle, gameSlug);
-      
-      if (claimResult.success) {
-        return {
-          success: true,
-          xHandle,
-          gameSlug,
-          developerHandle: xHandle,
-        };
-      } else {
+      if (!claimResult.success) {
+        console.error('Game claim error:', claimResult.error);
         return {
           success: false,
           error: claimResult.error,
-          xHandle,
+          gameSlug,
+          developerHandle: claimResult.developerHandle,
         };
       }
-    }
-
-    cookieStore.set('x_handle', xHandle, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-      sameSite: 'lax' as const,
-    });
-
-    if (xUserId) {
-      cookieStore.set('x_user_id', xUserId, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-        sameSite: 'lax' as const,
-      });
+      
+      return {
+        success: true,
+        xId,
+        xHandle,
+        gameSlug,
+      };
     }
 
     return {
       success: true,
+      xId,
       xHandle,
-      gameSlug,
     };
   } catch (error) {
-    console.error('X.com callback error:', error);
+    console.error('Error in handleXCallback:', error);
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'unknown_error' 
+      error: error instanceof Error ? error.name : 'unknown_error',
+      errorDetails: error instanceof Error ? error.message : String(error)
     };
   }
 }
@@ -269,35 +289,63 @@ export async function processCallback(code: string, state: string): Promise<Call
 
     if (!result.success) {
       let errorMessage = 'Authentication failed. Please try again.';
+      let errorType = result.error || 'unknown_error';
+      let errorDetails: any = { 
+        originalError: result.error,
+        timestamp: new Date().toISOString(),
+        code: code ? `${code.substring(0, 10)}...` : 'Missing',
+        state: state ? `${state.substring(0, 10)}...` : 'Missing',
+      };
 
       switch (result.error) {
         case 'missing_cookies':
           errorMessage = 'Authentication session expired. Please try again.';
+          errorDetails.cookieInfo = 'Required cookies for authentication were not found';
           break;
         case 'invalid_state':
           errorMessage = 'Invalid authentication state. Please try again.';
+          errorDetails.stateInfo = 'The state parameter did not match the expected value';
           break;
         case 'token_exchange_failed':
           errorMessage = 'Failed to exchange token with X.com. Please try again.';
+          errorDetails.tokenInfo = result.tokenError || 'Unknown token exchange error';
           break;
         case 'user_info_failed':
           errorMessage = 'Failed to retrieve user information from X.com. Please try again.';
+          errorDetails.userInfoError = result.userInfoError || 'Unknown user info error';
           break;
         case 'already_claimed':
-          return { redirect: `/games?info=already_claimed` };
+          return { 
+            redirect: `/games?info=already_claimed`,
+            errorType,
+            errorDetails
+          };
         case 'not_your_game':
           const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
+          errorDetails.gameSlug = gameSlug;
+          errorDetails.developerHandle = result.developerHandle;
+          
           if (gameSlug) {
             return {
               redirect: `/games/${gameSlug}?error=not_your_game&developer=${encodeURIComponent(
                 result.developerHandle || ''
               )}`,
+              errorType,
+              errorDetails
             };
           }
-          return { redirect: `/games?error=not_your_game` };
+          return { 
+            redirect: `/games?error=not_your_game`,
+            errorType,
+            errorDetails
+          };
       }
 
-      return { error: errorMessage };
+      return { 
+        error: errorMessage,
+        errorType,
+        errorDetails
+      };
     }
 
     const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
@@ -314,8 +362,21 @@ export async function processCallback(code: string, state: string): Promise<Call
     };
   } catch (error) {
     console.error('Error processing callback:', error);
+    
+    // Create detailed error information
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : 'Unknown',
+      timestamp: new Date().toISOString(),
+      code: code ? `${code.substring(0, 10)}...` : 'Missing',
+      state: state ? `${state.substring(0, 10)}...` : 'Missing'
+    };
+    
     return { 
-      error: error instanceof Error ? error.message : 'An unexpected error occurred during authentication.' 
+      error: error instanceof Error ? error.message : 'An unexpected error occurred during authentication.',
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      errorDetails
     };
   }
 }
