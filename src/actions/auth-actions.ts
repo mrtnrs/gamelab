@@ -253,13 +253,11 @@ export async function handleXCallback(code: string, state: string): Promise<Auth
           success: false,
           error: claimResult.error,
           gameSlug,
-          developerHandle: claimResult.developerHandle,
         };
       }
       
       return {
         success: true,
-        xId,
         xHandle,
         gameSlug,
       };
@@ -267,7 +265,6 @@ export async function handleXCallback(code: string, state: string): Promise<Auth
 
     return {
       success: true,
-      xId,
       xHandle,
     };
   } catch (error) {
@@ -275,7 +272,6 @@ export async function handleXCallback(code: string, state: string): Promise<Auth
     return { 
       success: false, 
       error: error instanceof Error ? error.name : 'unknown_error',
-      errorDetails: error instanceof Error ? error.message : String(error)
     };
   }
 }
