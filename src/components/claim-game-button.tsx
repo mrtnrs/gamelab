@@ -88,7 +88,7 @@ export default function ClaimGameButton({
 
       // Construct the authorization URL
       const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-      const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/callback`;
+      const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
 
       if (!clientId || !redirectUri) {
         throw new Error("Client ID or redirect URI not configured");
