@@ -1,39 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // Handle /auth/callback route
   if (request.nextUrl.pathname === "/auth/callback") {
-    // Extract query parameters
-    const url = request.nextUrl;
-    const code = url.searchParams.get("code") || "";
-    const state = url.searchParams.get("state") || "";
-    const error = url.searchParams.get("error") || "";
+    const code = request.nextUrl.searchParams.get("code") || "";
+    const state = request.nextUrl.searchParams.get("state") || "";
+    const error = request.nextUrl.searchParams.get("error") || "";
 
-    // Create new headers with the extracted parameters
-    const headers = new Headers(request.headers);
-    headers.set("x-oauth-code", code);
-    headers.set("x-oauth-state", state);
-    headers.set("x-oauth-error", error);
+    console.log("[Middleware] Extracted query params:", { code, state, error });
 
-    // Return the response with updated headers
-    return NextResponse.next({ headers });
+    const newHeaders = new Headers(request.headers);
+    const cookieString = [
+      `x-oauth-code=${encodeURIComponent(code)}`,
+      `x-oauth-state=${encodeURIComponent(state)}`,
+      `x-oauth-error=${encodeURIComponent(error)}`,
+    ].join("; ");
+    newHeaders.set("cookie", cookieString);
+
+    return NextResponse.next({
+      request: {
+        headers: newHeaders,
+      },
+    });
   }
-
-  // Log game detail page requests
-  if (request.nextUrl.pathname.startsWith("/games/")) {
-    const slug = request.nextUrl.pathname.split("/").pop();
-    console.log(`[Middleware] Game detail page requested for slug: ${slug}`);
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/auth/callback", // Apply to callback route
-    "/games/:slug*", // Match all game detail pages
-  ],
+  matcher: ["/auth/callback"],
 };
+
 
 // import { NextRequest, NextResponse } from 'next/server';
 

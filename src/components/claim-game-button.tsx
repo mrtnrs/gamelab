@@ -112,6 +112,7 @@ export default function ClaimGameButton({
         state
       )}; max-age=1800; path=/; secure; samesite=strict`;
 
+      console.log("Cookies set:", document.cookie);
       // Redirect to the authorization URL
       window.location.href = authUrl;
     } catch (error) {
