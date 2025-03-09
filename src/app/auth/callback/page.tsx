@@ -7,193 +7,198 @@ import { processCallback } from '@/actions/auth-actions';
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState<string>('Processing authentication...');
+  const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{
+    cookies: string;
+    url: string;
+    params: Record<string, string>;
+  }>({
+    cookies: '',
+    url: '',
+    params: {},
+  });
 
   useEffect(() => {
-    // Extract query parameters from the URL
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    const errorParam = searchParams.get('error');
+    const handleCallback = async () => {
+      try {
+        // Get URL parameters
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
+        const error = searchParams.get('error');
+        const errorDescription = searchParams.get('error_description');
 
-    // Handle error from the authentication provider
-    if (errorParam) {
-      setError(
-        errorParam === 'access_denied'
-          ? 'You denied access to your X account.'
-          : `Authentication error: ${errorParam}`
-      );
-      return;
-    }
+        // Collect debug information
+        const url = window.location.href;
+        const cookiesStr = document.cookie;
+        const params: Record<string, string> = {};
+        searchParams.forEach((value, key) => {
+          params[key] = value;
+        });
 
-    // Validate presence of code and state
-    if (!code || !state) {
-      setError('Missing code or state parameters.');
-      return;
-    }
+        setDebugInfo({
+          cookies: cookiesStr,
+          url,
+          params,
+        });
 
-    // Process the authentication callback
-    processCallback(code, state)
-      .then((result) => {
+        // Handle Twitter OAuth error
+        if (error) {
+          setStatus('error');
+          setMessage(`X.com authentication error: ${error}`);
+          setErrorDetails({
+            error,
+            errorDescription,
+            timestamp: new Date().toISOString()
+          });
+          setErrorType('oauth_error');
+          return;
+        }
+
+        // Validate required parameters
+        if (!code || !state) {
+          setStatus('error');
+          setMessage('Missing required parameters for authentication.');
+          setErrorDetails({
+            missingCode: !code,
+            missingState: !state,
+            timestamp: new Date().toISOString()
+          });
+          setErrorType('missing_parameters');
+          return;
+        }
+
+        // Process the callback
+        const result = await processCallback(code, state);
+
         if (result.error) {
-          setError(result.error);
+          setStatus('error');
+          setMessage(result.error);
+          setErrorDetails(result.errorDetails || null);
+          setErrorType(result.errorType || 'unknown_error');
         } else if (result.redirect) {
+          // Successful authentication, redirect
           router.push(result.redirect);
         } else {
-          // Fallback redirect to home if no redirect is specified
-          router.push('/');
+          setStatus('success');
+          setMessage('Authentication successful! Redirecting...');
+          setTimeout(() => {
+            router.push('/');
+          }, 2000);
         }
-      })
-      .catch((err) => {
-        console.error('Error handling authentication callback:', err);
-        setError('An unexpected error occurred during authentication.');
-      });
-  }, [searchParams, router]);
+      } catch (error) {
+        console.error('Error in auth callback:', error);
+        setStatus('error');
+        setMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+        setErrorDetails({
+          error: String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+        setErrorType('callback_exception');
+      }
+    };
 
-  // Render error state if present
-  if (error) {
-    return (
-      <div className="container mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-        <p className="text-red-500 mb-4">{error}</p>
-        <a
-          href="/"
-          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-        >
-          Return to Home
-        </a>
+    handleCallback();
+  }, [router, searchParams]);
+
+  return (
+    <div className="container flex items-center justify-center min-h-screen py-12">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold mb-2">X.com Authentication</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            {status === 'loading'
+              ? 'Processing your authentication...'
+              : status === 'success'
+              ? 'Authentication successful!'
+              : 'Authentication failed'}
+          </p>
+          
+          {status === 'loading' && (
+            <div className="flex flex-col items-center justify-center py-6 space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
+            </div>
+          )}
+
+          {status === 'success' && (
+            <div className="flex flex-col items-center justify-center py-6 space-y-4">
+              <div className="h-8 w-8 text-green-500">✓</div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="space-y-4">
+              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">⚠️</div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Authentication Error</h3>
+                    <div className="mt-2 text-sm text-red-700 dark:text-red-300">{message}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => router.push('/')}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none"
+                >
+                  ← Return to Home
+                </button>
+              </div>
+
+              <hr className="my-4 border-gray-200 dark:border-gray-700" />
+
+              <div className="w-full">
+                <details className="mb-2">
+                  <summary className="cursor-pointer p-2 bg-gray-50 dark:bg-gray-700 rounded-md">Error Details</summary>
+                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-md mt-1">
+                    <div className="text-sm space-y-2">
+                      <p><strong>Error Type:</strong> {errorType || 'Unknown'}</p>
+                      {errorDetails && (
+                        <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-60">
+                          <pre className="text-xs whitespace-pre-wrap">
+                            {JSON.stringify(errorDetails, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </details>
+
+                <details>
+                  <summary className="cursor-pointer p-2 bg-gray-50 dark:bg-gray-700 rounded-md">Debug Information</summary>
+                  <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-md mt-1">
+                    <div className="text-sm space-y-2">
+                      <p><strong>URL:</strong></p>
+                      <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-40">
+                        <pre className="text-xs whitespace-pre-wrap break-all">{debugInfo.url}</pre>
+                      </div>
+
+                      <p><strong>Parameters:</strong></p>
+                      <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-40">
+                        <pre className="text-xs whitespace-pre-wrap">
+                          {JSON.stringify(debugInfo.params, null, 2)}
+                        </pre>
+                      </div>
+
+                      <p><strong>Cookies:</strong></p>
+                      <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-40">
+                        <pre className="text-xs whitespace-pre-wrap break-all">{debugInfo.cookies}</pre>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    );
-  }
-
-  // Default loading state while processing
-  return <div>Processing authentication...</div>;
+    </div>
+  );
 }
-
-// import { processCallback } from "@/actions/auth-actions";
-// import { headers } from "next/headers";
-// import { redirect } from "next/navigation";
-
-// // Define the correct types for Next.js 15
-// type Props = {
-//   params: Promise<{}>;
-//   searchParams: Promise<{
-//     code?: string | string[];
-//     state?: string | string[];
-//     error?: string | string[];
-//   }>;
-// };
-
-// export default async function XAuthCallbackPage({ params }: Props) {
-//   // Await the params (though unused here)
-//   await params;
-
-//   // Read headers set by middleware
-//   const headersList = await headers();
-//   const code = headersList.get("x-oauth-code") || "";
-//   const state = headersList.get("x-oauth-state") || "";
-//   const error = headersList.get("x-oauth-error") || "";
-
-//   console.log("Headers from middleware:", { code, state, error });
-
-//   // Handle errors from X.com
-//   if (error) {
-//     return (
-//       <div className="container mx-auto p-8 text-center">
-//         <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-//         <p className="text-red-500 mb-4">
-//           {error === "access_denied"
-//             ? "You denied access to your X account."
-//             : `An error occurred during authentication: ${error}`}
-//         </p>
-//         <a
-//           href="/"
-//           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-//         >
-//           Return to Home
-//         </a>
-//       </div>
-//     );
-//   }
-
-//   // Validate required parameters
-//   if (!code || !state) {
-//     return (
-//       <div className="container mx-auto p-8 text-center">
-//         <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-//         <p className="text-red-500 mb-4">Missing code or state parameters.</p>
-//         <pre className="text-left bg-gray-100 p-2 rounded">
-//           {JSON.stringify({ code, state }, null, 2)}
-//         </pre>
-//         <a
-//           href="/"
-//           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-//         >
-//           Return to Home
-//         </a>
-//       </div>
-//     );
-//   }
-
-//   try {
-//     // Process the callback using the server action
-//     const result = await processCallback(code, state);
-
-//     if (result.error) {
-//       return (
-//         <div className="container mx-auto p-8 text-center">
-//           <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-//           <p className="text-red-500 mb-4">{result.error}</p>
-//           <div className="bg-gray-100 p-4 rounded-md text-left mb-4 max-w-lg mx-auto">
-//             <h2 className="font-semibold mb-2">Debug Information:</h2>
-//             <p>Code: {code ? code.substring(0, 10) + "..." : "Missing"}</p>
-//             <p>State: {state ? state.substring(0, 10) + "..." : "Missing"}</p>
-//           </div>
-//           <a
-//             href="/"
-//             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-//           >
-//             Return to Home
-//           </a>
-//         </div>
-//       );
-//     }
-
-//     if (result.redirect) {
-//       redirect(result.redirect);
-//     }
-
-//     // Fallback if no redirect is provided (should not happen)
-//     return (
-//       <div className="container mx-auto p-8 text-center">
-//         <h1 className="text-2xl font-bold mb-4">Authentication Successful</h1>
-//         <p className="mb-4">You have been authenticated successfully.</p>
-//         <a
-//           href="/"
-//           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-//         >
-//           Return to Home
-//         </a>
-//       </div>
-//     );
-//   } catch (error) {
-//     console.error("Error handling X callback:", error);
-//     return (
-//       <div className="container mx-auto p-8 text-center">
-//         <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-//         <p className="text-red-500 mb-4">
-//           An unexpected error occurred during authentication.
-//         </p>
-//         <div className="bg-gray-100 p-4 rounded-md text-left mb-4 max-w-lg mx-auto">
-//           <h2 className="font-semibold mb-2">Debug Information:</h2>
-//           <p>Error: {error instanceof Error ? error.message : String(error)}</p>
-//         </div>
-//         <a
-//           href="/"
-//           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
-//         >
-//           Return to Home
-//         </a>
-//       </div>
-//     );
-//   }
-// }
