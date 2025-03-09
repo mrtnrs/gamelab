@@ -1,24 +1,41 @@
-import Header from '@/components/header';
-import Footer from '@/components/footer';
+// src/app/games/[slug]/page.tsx
 import GameDetailClient from './game-detail-client';
-import { supabase } from '@/utils/supabase';
-import { Metadata, ResolvingMetadata } from 'next';
 import { gameService } from '@/services/game-service';
+import { Metadata, ResolvingMetadata } from 'next';
 import { generateSlug } from '@/utils/slug';
+import { supabase } from '@/utils/supabase';
+import { cookies } from 'next/headers';
 
-// Define props type matching the working version
+// Helper function to extract handle from URL
+function extractHandleFromUrl(url: string): string | null {
+  if (!url) return null;
+  try {
+    let urlObj: URL;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      urlObj = new URL(`https://${url}`);
+    } else {
+      urlObj = new URL(url);
+    }
+    const path = urlObj.pathname.replace(/^\//, '');
+    return path.split('/')[0] || null;
+  } catch (error) {
+    const match = url.match(/(?:x\.com|twitter\.com)\/([^\/\?]+)/i);
+    return match ? match[1] : null;
+  }
+}
+
+// Define the correct types for Next.js 15
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-// Generate metadata for the game page
+// Generate metadata (unchanged)
 export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const { slug } = await params; // Await the Promise to get the slug
-
-  // Fetch the game data
+  const resolvedParams = await params;
+  const { slug } = resolvedParams;
   const game = await gameService.getGameBySlug(slug);
 
   if (!game) {
@@ -63,27 +80,49 @@ export async function generateMetadata(
   };
 }
 
-// Static generation configuration
-export const dynamicParams = false; // Only pre-render known slugs at build time
-// Note: We're using dynamicParams = false for static generation
-// We don't need edge runtime as we're pre-rendering all pages at build time
+// Static generation configuration (unchanged)
+export const dynamicParams = false;
 
-// Main page component
 export default async function GamePage({ params }: Props) {
-  const { slug } = await params; // Await the Promise to get the slug
+  const resolvedParams = await params;
+  const { slug } = resolvedParams;
+
+  // Fetch the game data server-side
+  const game = await gameService.getGameBySlug(slug);
+
+  if (!game) {
+    return <div>Game not found</div>;
+  }
+
+  // Fetch changelogs
+  const changelogs = await gameService.getChangelogs(game.id);
+
+  // Check if user is the developer
+  let isGameDeveloper = false;
+  if (game.claimed) {
+    const cookieStore = await cookies();
+    const xHandle = cookieStore.get('x_handle')?.value;
+    if (xHandle) {
+      const gameDeveloperHandle = game.developer_url ? extractHandleFromUrl(game.developer_url) : '';
+      if (gameDeveloperHandle && gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
+        isGameDeveloper = true;
+      }
+    }
+  }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <main className="flex-grow pt-16">
-        <GameDetailClient slug={slug} />
-      </main>
-      <Footer />
-    </div>
+    <GameDetailClient
+      game={game}
+      slug={slug}
+      initialChangelogs={changelogs}
+      isGameDeveloper={isGameDeveloper}
+      userRating={null}
+      comments={[]}
+    />
   );
 }
 
-// Generate static paths at build time
+// Generate static paths (unchanged)
 export async function generateStaticParams(): Promise<{ slug: string }[]> {
   try {
     const { data: games, error } = await supabase
@@ -103,14 +142,9 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
 
     console.log(`Generating static paths for ${games.length} games`);
 
-    // For each game, generate a slug from the title using our enhanced utility
-    const paths = games.map((game) => {
-      const slug = generateSlug(game.title);
-      console.log(`Generated slug for "${game.title}": ${slug}`);
-      return { slug };
-    });
-
-    return paths;
+    return games.map((game) => ({
+      slug: generateSlug(game.title),
+    }));
   } catch (error) {
     console.error('Error in generateStaticParams:', error);
     return [];

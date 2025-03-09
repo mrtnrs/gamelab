@@ -229,10 +229,32 @@ export const gameService = {
       if (matchedGame) {
         console.log(`[getGameBySlug] Successfully found game: ${matchedGame.title}`);
         
+        // Get the most up-to-date game data directly from the database
+        const { data: freshGameData, error: freshError } = await supabase
+          .from('games')
+          .select('*')
+          .eq('id', matchedGame.id)
+          .single();
+        
+        if (freshError) {
+          console.error('[getGameBySlug] Error fetching fresh game data:', freshError);
+          // Continue with the matched game data if we can't get fresh data
+        } else if (freshGameData) {
+          console.log('[getGameBySlug] Retrieved fresh game data:', {
+            id: freshGameData.id,
+            title: freshGameData.title,
+            claimed: freshGameData.claimed,
+            developer_url: freshGameData.developer_url
+          });
+          matchedGame = freshGameData;
+        }
+        
         // Increment visit count in the background
-        this.incrementVisitCount(matchedGame.id).catch(err => {
-          console.error('Error incrementing visit count:', err);
-        });
+        if (matchedGame) {
+          this.incrementVisitCount(matchedGame.id).catch(err => {
+            console.error('Error incrementing visit count:', err);
+          });
+        }
         
         return matchedGame;
       } else {

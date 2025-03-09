@@ -89,9 +89,10 @@ export default function RootLayout({
           <AuthProvider>
             <BookmarkProvider>
               {children}
-              <Toaster position="top-right" />
+              
             </BookmarkProvider>
           </AuthProvider>
+          <Toaster position="top-right" />
         </ThemeProvider>
       </body>
     </html>
