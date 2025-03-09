@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useSearchParams } from "next/navigation";
-// import { startXAuth } from "@/actions/auth-actions"; // Commented out as it's no longer used
 
 // Helper function to generate a random string for state and codeVerifier
 function generateRandomString(length: number): string {
@@ -63,6 +62,8 @@ export default function ClaimGameButton({
         displayMessage = "Your X handle does not match the developer URL.";
       } else if (errorMessage === "already_claimed") {
         displayMessage = "This game has already been claimed.";
+      } else if (errorMessage === "auth_failed") {
+        displayMessage = "Authentication failed. Please try again.";
       }
       toast.error(displayMessage);
     }
@@ -79,36 +80,40 @@ export default function ClaimGameButton({
   const handleStartAuth = async () => {
     try {
       setIsLoading(true);
-      // // Call the server action to start X auth
-      // await startXAuth(gameId, gameSlug);
-      // // This won't be reached because startXAuth redirects
 
       // Generate OAuth2 parameters on the client side
       const state = generateRandomString(32);
       const codeVerifier = generateRandomString(64);
       const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-      // Send the parameters to the edge API route
-      const response = await fetch("/api/auth/start", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          gameId,
-          gameSlug,
-          state,
-          codeVerifier,
-          codeChallenge,
-        }),
-      });
+      // Construct the authorization URL
+      const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+      const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
 
-      if (!response.ok) {
-        throw new Error("Failed to start authentication");
+      if (!clientId || !redirectUri) {
+        throw new Error("Client ID or redirect URI not configured");
       }
 
-      const { authUrl } = await response.json();
-      window.location.href = authUrl; // Redirect to the authorization URL
+      const authUrl = `https://twitter.com/i/oauth2/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: "tweet.read users.read",
+        state: `${state}|${gameId}|${gameSlug}`, // Encode gameId and gameSlug in state
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+      })}`;
+
+      // Store codeVerifier and state in client-side cookies
+      document.cookie = `x_code_verifier=${encodeURIComponent(
+        codeVerifier
+      )}; max-age=1800; path=/; secure; samesite=strict`;
+      document.cookie = `x_auth_state=${encodeURIComponent(
+        state
+      )}; max-age=1800; path=/; secure; samesite=strict`;
+
+      // Redirect to the authorization URL
+      window.location.href = authUrl;
     } catch (error) {
       console.error("Error starting auth:", error);
       toast.error("Failed to start authentication. Please try again.");
@@ -121,7 +126,7 @@ export default function ClaimGameButton({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        disabled={isLoading} // Only disable when loading, not when claimed
+        disabled={isLoading}
         className={`flex items-center space-x-2 px-3 py-1 text-sm border border-border rounded-md transition-colors ${
           isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-accent"
         }`}
