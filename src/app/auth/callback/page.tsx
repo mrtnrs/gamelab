@@ -1,5 +1,5 @@
 import { processCallback } from "@/actions/auth-actions";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 // Define the correct types for Next.js 15
@@ -12,32 +12,17 @@ type Props = {
   }>;
 };
 
-export default async function XAuthCallbackPage({ params, searchParams }: Props) {
-  // Await the params and searchParams Promises in Next.js 15
+export default async function XAuthCallbackPage({ params }: Props) {
+  // Await the params (though unused here)
   await params;
-  const resolvedSearchParams = await searchParams;
-  
-  // Handle search parameters (Next.js 15 may return arrays for multi-value params)
-  const code =
-    typeof resolvedSearchParams.code === "string"
-      ? resolvedSearchParams.code
-      : Array.isArray(resolvedSearchParams.code)
-      ? resolvedSearchParams.code[0]
-      : undefined;
-  const state =
-    typeof resolvedSearchParams.state === "string"
-      ? resolvedSearchParams.state
-      : Array.isArray(resolvedSearchParams.state)
-      ? resolvedSearchParams.state[0]
-      : undefined;
-  const error =
-    typeof resolvedSearchParams.error === "string"
-      ? resolvedSearchParams.error
-      : Array.isArray(resolvedSearchParams.error)
-      ? resolvedSearchParams.error[0]
-      : undefined;
 
-  console.log("Auth callback parameters:", { code, state, error });
+  // Read headers set by middleware
+  const headersList = await headers();
+  const code = headersList.get("x-oauth-code") || "";
+  const state = headersList.get("x-oauth-state") || "";
+  const error = headersList.get("x-oauth-error") || "";
+
+  console.log("Headers from middleware:", { code, state, error });
 
   // Handle errors from X.com
   if (error) {
@@ -65,6 +50,9 @@ export default async function XAuthCallbackPage({ params, searchParams }: Props)
       <div className="container mx-auto p-8 text-center">
         <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
         <p className="text-red-500 mb-4">Missing code or state parameters.</p>
+        <pre className="text-left bg-gray-100 p-2 rounded">
+          {JSON.stringify({ code, state }, null, 2)}
+        </pre>
         <a
           href="/"
           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
