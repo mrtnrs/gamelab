@@ -49,6 +49,14 @@ export type AuthResult = {
   userInfoError?: string;
 };
 
+// interface AuthResult {
+//   success: boolean;
+//   xHandle?: string;
+//   gameSlug?: string;
+//   error?: string;
+//   userInfoError?: string;
+// }
+
 export type CallbackResult = {
   error?: string;
   redirect?: string;
@@ -56,9 +64,6 @@ export type CallbackResult = {
   errorType?: string;
 };
 
-/**
- * Start X.com authentication flow
- */
 export async function startXAuth(gameId: string, gameSlug: string) {
   const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
   const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
@@ -67,36 +72,33 @@ export async function startXAuth(gameId: string, gameSlug: string) {
     throw new Error('X.com client ID is not configured');
   }
 
+  // Generate random state and codeVerifier
   const state = generateRandomString(32);
   const codeVerifier = generateRandomString(64);
   const codeChallenge = generateCodeChallenge(codeVerifier);
 
+  // Define cookie options
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 30, // Increased to 30 minutes to prevent expiration
+    maxAge: 60 * 30, // 30 minutes
     path: '/',
     sameSite: 'lax' as const,
   };
 
-  // Get the cookies store and await it
+  // Store the full state (including gameId and gameSlug)
+  const fullState = `${state}|${gameId}|${gameSlug}`;
   const cookieStore = await cookies();
-  
-  // Set cookies using the resolved cookie store
-  cookieStore.set('x_auth_state', state, cookieOptions);
+  cookieStore.set('x_auth_state', fullState, cookieOptions);
   cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
 
-  if (gameId && gameSlug) {
-    cookieStore.set('game_to_claim', gameId, cookieOptions);
-    cookieStore.set('game_to_claim_slug', gameSlug, cookieOptions);
-  }
-
+  // Construct the authorization URL
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     scope: 'tweet.read users.read',
-    state,
+    state: fullState,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
   });
@@ -104,6 +106,56 @@ export async function startXAuth(gameId: string, gameSlug: string) {
   const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
   redirect(authUrl);
 }
+
+/**
+ * Start X.com authentication flow
+ */
+// export async function startXAuth(gameId: string, gameSlug: string) {
+//   const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+//   const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
+
+//   if (!CLIENT_ID) {
+//     throw new Error('X.com client ID is not configured');
+//   }
+
+//   const state = generateRandomString(32);
+//   const codeVerifier = generateRandomString(64);
+//   const codeChallenge = generateCodeChallenge(codeVerifier);
+
+//   const cookieOptions = {
+//     httpOnly: true,
+//     secure: process.env.NODE_ENV === 'production',
+//     maxAge: 60 * 30, // Increased to 30 minutes to prevent expiration
+//     path: '/',
+//     sameSite: 'lax' as const,
+//   };
+
+//   // Get the cookies store and await it
+//   const cookieStore = await cookies();
+  
+//   // Set cookies using the resolved cookie store
+//   cookieStore.set('x_auth_state', state, cookieOptions);
+//   cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
+
+//   if (gameId && gameSlug) {
+//     cookieStore.set('game_to_claim', gameId, cookieOptions);
+//     cookieStore.set('game_to_claim_slug', gameSlug, cookieOptions);
+//   }
+
+//   const params = new URLSearchParams({
+//     response_type: 'code',
+//     client_id: CLIENT_ID,
+//     redirect_uri: REDIRECT_URI,
+//     scope: 'tweet.read users.read',
+//     state,
+//     code_challenge: codeChallenge,
+//     code_challenge_method: 'S256',
+//   });
+
+//   const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+//   redirect(authUrl);
+// }
+
 
 /**
  * Exchange token with retry logic for rate limiting
@@ -161,75 +213,153 @@ async function exchangeTokenWithRetry(
 /**
  * Handle X.com OAuth callback
  */
+// export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
+//   try {
+//     // Parse state to extract original state, gameId, and gameSlug
+//     const [storedState, gameId, gameSlug] = state.split('|');
+//     if (!storedState) {
+//       console.error('Invalid state format:', state);
+//       return { success: false, error: 'invalid_state' };
+//     }
+
+//     // Retrieve codeVerifier and state from cookies
+//     const cookieStore = await cookies();
+//     const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
+//     const storedStateCookie = cookieStore.get('x_auth_state')?.value;
+
+//     // Validate cookies and state
+//     if (!storedCodeVerifier || !storedStateCookie) {
+//       console.error('Missing cookies:', { storedCodeVerifier, storedStateCookie });
+//       return { success: false, error: 'missing_cookies' };
+//     }
+
+//     if (storedStateCookie !== storedState) {
+//       console.error('State mismatch:', { storedStateCookie, storedState });
+//       return { success: false, error: 'invalid_state' };
+//     }
+
+//     // Exchange code for tokens
+//     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/x-www-form-urlencoded',
+//         Authorization: `Basic ${Buffer.from(
+//           `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
+//         ).toString('base64')}`,
+//       },
+//       body: new URLSearchParams({
+//         code,
+//         grant_type: 'authorization_code',
+//         client_id: process.env.TWITTER_CLIENT_ID || '',
+//         redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+//         code_verifier: storedCodeVerifier,
+//       }).toString(),
+//     });
+
+//     if (!tokenResponse.ok) {
+//       const errorText = await tokenResponse.text();
+//       let tokenError;
+//       try {
+//         // Try to parse the error as JSON
+//         tokenError = JSON.parse(errorText);
+//       } catch (e) {
+//         // If it's not valid JSON, use the raw text
+//         tokenError = errorText;
+//       }
+      
+//       console.error('Token exchange error:', tokenError);
+//       return { 
+//         success: false, 
+//         error: 'token_exchange_failed',
+//         tokenError: typeof tokenError === 'object' ? JSON.stringify(tokenError) : String(tokenError)
+//       };
+//     }
+
+//     const tokenData = await tokenResponse.json();
+//     const accessToken = tokenData.access_token;
+
+//     // Get user info
+//     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
+//       headers: {
+//         Authorization: `Bearer ${accessToken}`,
+//       },
+//     });
+
+//     if (!userResponse.ok) {
+//       const errorText = await userResponse.text();
+//       console.error('User info error:', errorText);
+//       return { success: false, error: 'user_info_failed', userInfoError: errorText };
+//     }
+
+//     const userData = await userResponse.json();
+//     const xId = userData.data.id;
+//     const xHandle = userData.data.username;
+
+//     // If gameId is provided, attempt to claim the game
+//     if (gameId && gameSlug) {
+//       const claimResult = await claimGame(gameId, xId, xHandle);
+      
+//       if (!claimResult.success) {
+//         console.error('Game claim error:', claimResult.error);
+//         return {
+//           success: false,
+//           error: claimResult.error,
+//           gameSlug,
+//         };
+//       }
+      
+//       return {
+//         success: true,
+//         xHandle,
+//         gameSlug,
+//       };
+//     }
+
+//     return {
+//       success: true,
+//       xHandle,
+//     };
+//   } catch (error) {
+//     console.error('Error in handleXCallback:', error);
+//     return { 
+//       success: false, 
+//       error: error instanceof Error ? error.name : 'unknown_error',
+//     };
+//   }
+// }
+
 export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
   try {
-    // Parse state to extract original state, gameId, and gameSlug
-    const [storedState, gameId, gameSlug] = state.split('|');
-    if (!storedState) {
-      console.error('Invalid state format:', state);
-      return { success: false, error: 'invalid_state' };
-    }
-
-    // Retrieve codeVerifier and state from cookies
+    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
     const cookieStore = await cookies();
-    const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
     const storedStateCookie = cookieStore.get('x_auth_state')?.value;
+    const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
 
-    // Validate cookies and state
+    // Log for debugging
+    console.log('Callback received:', { code: code?.substring(0, 10) + '...', state });
+
+    // Validate cookies
     if (!storedCodeVerifier || !storedStateCookie) {
-      console.error('Missing cookies:', { storedCodeVerifier, storedStateCookie });
+      console.error('Missing required cookies:', { storedStateCookie, storedCodeVerifier });
       return { success: false, error: 'missing_cookies' };
     }
 
-    if (storedStateCookie !== storedState) {
-      console.error('State mismatch:', { storedStateCookie, storedState });
+    // Validate state
+    if (storedStateCookie !== state) {
+      console.error('State validation failed:', { receivedState: state, storedState: storedStateCookie });
       return { success: false, error: 'invalid_state' };
     }
 
-    // Exchange code for tokens
-    const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(
-          `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
-        ).toString('base64')}`,
-      },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        client_id: process.env.TWITTER_CLIENT_ID || '',
-        redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-        code_verifier: storedCodeVerifier,
-      }).toString(),
-    });
+    // Extract gameId and gameSlug from state
+    const [, gameId, gameSlug] = state.split('|');
 
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      let tokenError;
-      try {
-        // Try to parse the error as JSON
-        tokenError = JSON.parse(errorText);
-      } catch (e) {
-        // If it's not valid JSON, use the raw text
-        tokenError = errorText;
-      }
-      
-      console.error('Token exchange error:', tokenError);
-      return { 
-        success: false, 
-        error: 'token_exchange_failed',
-        tokenError: typeof tokenError === 'object' ? JSON.stringify(tokenError) : String(tokenError)
-      };
-    }
+    // Exchange code for access token
+    const tokenData = await exchangeTokenWithRetry(code, storedCodeVerifier, REDIRECT_URI);
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    // Get user info
+    // Fetch user information
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${tokenData.access_token}`,
       },
     });
 
@@ -243,36 +373,20 @@ export async function handleXCallback(code: string, state: string): Promise<Auth
     const xId = userData.data.id;
     const xHandle = userData.data.username;
 
-    // If gameId is provided, attempt to claim the game
+    // Claim game if applicable
     if (gameId && gameSlug) {
       const claimResult = await claimGame(gameId, xId, xHandle);
-      
       if (!claimResult.success) {
         console.error('Game claim error:', claimResult.error);
-        return {
-          success: false,
-          error: claimResult.error,
-          gameSlug,
-        };
+        return { success: false, error: claimResult.error, gameSlug };
       }
-      
-      return {
-        success: true,
-        xHandle,
-        gameSlug,
-      };
+      return { success: true, xHandle, gameSlug };
     }
 
-    return {
-      success: true,
-      xHandle,
-    };
+    return { success: true, xHandle };
   } catch (error) {
     console.error('Error in handleXCallback:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.name : 'unknown_error',
-    };
+    return { success: false, error: 'callback_exception' };
   }
 }
 
