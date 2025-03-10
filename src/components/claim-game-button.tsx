@@ -3,25 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useSearchParams } from "next/navigation";
-
-// Helper function to generate a random string for state and codeVerifier
-function generateRandomString(length: number): string {
-  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  const randomValues = new Uint8Array(length);
-  crypto.getRandomValues(randomValues);
-  return Array.from(randomValues)
-    .map((value) => charset[value % charset.length])
-    .join("");
-}
-
-// Helper function to generate codeChallenge from codeVerifier
-async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const base64Digest = btoa(String.fromCharCode(...new Uint8Array(digest)));
-  return base64Digest.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+import { startXAuth } from "@/actions/auth-actions"; // Import the server action
 
 interface ClaimGameButtonProps {
   gameId: string;
@@ -81,43 +63,15 @@ export default function ClaimGameButton({
     try {
       setIsLoading(true);
 
-      // Generate OAuth2 parameters on the client side
-      const state = generateRandomString(32);
-      const codeVerifier = generateRandomString(64);
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      // Call the server action to start authentication
+      await startXAuth(gameId, gameSlug);
 
-      // Construct the authorization URL
-      const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-      const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-
-      if (!clientId || !redirectUri) {
-        throw new Error("Client ID or redirect URI not configured");
-      }
-
-      const authUrl = `https://twitter.com/i/oauth2/authorize?${new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        scope: "tweet.read users.read",
-        state: `${state}|${gameId}|${gameSlug}`, // Encode gameId and gameSlug in state
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-      })}`;
-
-      // Store codeVerifier and state in client-side cookies
-      document.cookie = `x_code_verifier=${encodeURIComponent(
-        codeVerifier
-      )}; max-age=1800; path=/; secure; samesite=strict`;
-      document.cookie = `x_auth_state=${encodeURIComponent(
-        state
-      )}; max-age=1800; path=/; secure; samesite=strict`;
-
-      console.log("Cookies set:", document.cookie);
-      // Redirect to the authorization URL
-      window.location.href = authUrl;
+      // The server action will handle cookie setting and redirect
+      // No additional client-side logic needed here
     } catch (error) {
       console.error("Error starting auth:", error);
       toast.error("Failed to start authentication. Please try again.");
+    } finally {
       setIsLoading(false);
       setIsOpen(false);
     }
