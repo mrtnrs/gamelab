@@ -344,7 +344,7 @@ export async function processCallback(
  * This should be called before redirecting to the Twitter auth page
  */
 export async function setGameClaimCookies(gameId: string, gameSlug: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   
   // Set cookies with game information to be used after authentication
   cookieStore.set("game_claim_id", gameId, {

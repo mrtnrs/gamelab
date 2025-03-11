@@ -37,6 +37,18 @@ interface TwitterProfile {
   data: TwitterData["data"];
 }
 
+// Extend the User type to include our custom properties
+interface ExtendedUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  image?: string;
+  xId?: string;
+  xHandle?: string;
+  gameId?: string;
+  gameSlug?: string;
+}
+
 // Auth.js configuration
 export const {
 	handlers: { GET, POST },
@@ -77,20 +89,23 @@ export const {
         // Use type assertion with unknown first to avoid TypeScript error
         const twitterProfile = profile as unknown as TwitterProfile;
         
+        // Cast user to our extended type
+        const extUser = user as ExtendedUser;
+        
         // Store Twitter data in user object for later use
-        user.xId = twitterProfile.data.id;
-        user.xHandle = twitterProfile.data.username;
+        extUser.xId = twitterProfile.data.id;
+        extUser.xHandle = twitterProfile.data.username;
         
         // Check if there's a game claim request in the cookies
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const gameIdCookie = cookieStore.get("game_claim_id")?.value;
         const gameSlugCookie = cookieStore.get("game_claim_slug")?.value;
         
         if (gameIdCookie && gameSlugCookie) {
           // We'll handle the game claiming in the session callback
           // Just pass the data through for now
-          user.gameId = gameIdCookie;
-          user.gameSlug = gameSlugCookie;
+          extUser.gameId = gameIdCookie;
+          extUser.gameSlug = gameSlugCookie;
         }
       }
       
@@ -106,9 +121,12 @@ export const {
       }
       
       // Pass game claim information from user to token
-      if (user && 'gameId' in user && 'gameSlug' in user) {
-        token.gameId = user.gameId;
-        token.gameSlug = user.gameSlug;
+      if (user) {
+        const extUser = user as ExtendedUser;
+        if (extUser.gameId && extUser.gameSlug) {
+          token.gameId = extUser.gameId;
+          token.gameSlug = extUser.gameSlug;
+        }
       }
       
       return token;
@@ -134,7 +152,7 @@ export const {
             const result = await verifyAndClaimGame(token.gameId as string, token.gameSlug as string);
             
             // Clear the claim cookies after processing
-            const cookieStore = cookies();
+            const cookieStore = await cookies();
             cookieStore.delete("game_claim_id");
             cookieStore.delete("game_claim_slug");
             
