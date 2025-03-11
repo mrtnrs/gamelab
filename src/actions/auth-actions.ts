@@ -339,6 +339,31 @@ export async function processCallback(
   }
 }
 
+/**
+ * Sets cookies for game claiming during the authentication flow
+ * This should be called before redirecting to the Twitter auth page
+ */
+export async function setGameClaimCookies(gameId: string, gameSlug: string) {
+  const cookieStore = cookies();
+  
+  // Set cookies with game information to be used after authentication
+  cookieStore.set("game_claim_id", gameId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 10, // 10 minutes
+    path: "/",
+  });
+  
+  cookieStore.set("game_claim_slug", gameSlug, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 10, // 10 minutes
+    path: "/",
+  });
+  
+  return { success: true };
+}
+
 export async function claimGame(gameId: string, xId: string, xHandle: string): Promise<{ success: boolean; error?: string }> {
   try {
   //  console.log('Claiming game', { gameId, xId, xHandle });
