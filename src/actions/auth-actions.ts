@@ -5,7 +5,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { auth } from '@/auth';
-import * as crypto from 'crypto'
+import CryptoJS from 'crypto-js';
+import { enc as CryptoJSEnc, lib as CryptoJSLib } from 'crypto-js';
 
 interface RedirectError extends Error {
   digest: string;
@@ -38,14 +39,28 @@ const createServerSupabaseClient = () => {
 
 // Helper function to generate a random string
 function generateRandomString(length: number): string {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+  const randomWords = CryptoJS.lib.WordArray.random(Math.ceil(length / 2));
+  return randomWords.toString(CryptoJSEnc.Hex).slice(0, length);
 }
 
 // Helper function to create a SHA-256 hash and base64url encode it
 function generateCodeChallenge(verifier: string): string {
-  const hash = crypto.createHash('sha256').update(verifier).digest();
-  return hash.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = CryptoJS.SHA256(verifier);
+  // Convert to base64 and make it URL safe
+  const base64 = hash.toString(CryptoJSEnc.Base64);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+// // Helper function to generate a random string
+// function generateRandomString(length: number): string {
+//   return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+// }
+
+// // Helper function to create a SHA-256 hash and base64url encode it
+// function generateCodeChallenge(verifier: string): string {
+//   const hash = crypto.createHash('sha256').update(verifier).digest();
+//   return hash.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// }
 
 export type AuthResult = {
   success: boolean;
