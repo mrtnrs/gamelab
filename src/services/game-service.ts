@@ -1,6 +1,7 @@
 import { supabase } from '@/utils/supabase'
 import { generateSlug, getSlugVariations, slugsMatch } from '@/utils/slug';
 import { Game, GameFormData } from '@/types/game';
+import { generateUUID } from '@/utils/crypto-utils';
 
 // Comment type definition
 export interface GameComment {
@@ -1144,7 +1145,7 @@ export const gameService = {
       }
       
       // Generate a unique ID for the changelog
-      const changelogId = crypto.randomUUID();
+      const changelogId = generateUUID();
       
       // Create the new changelog object
       const newChangelog: Changelog = {
