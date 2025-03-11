@@ -4,8 +4,22 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
-import { setTimeout } from 'timers/promises';
+import { auth } from '@/auth';
+import * as crypto from 'crypto'
+
+interface RedirectError extends Error {
+  digest: string;
+}
+
+// Type guard
+function isRedirectError(error: unknown): error is { digest: string } {
+  return (
+    error instanceof Error &&
+    'digest' in error &&
+    typeof error.digest === 'string' &&
+    error.digest.startsWith('NEXT_REDIRECT')
+  );
+}
 
 // Create a Supabase client with the service role key (server-side only)
 const createServerSupabaseClient = () => {
@@ -59,7 +73,7 @@ export async function startXAuth(gameId: string, gameSlug: string) {
     throw new Error('X.com client ID is not configured');
   }
 
-  console.log('Starting X.com authentication', { gameId, gameSlug });
+  // console.log('Starting X.com authentication', { gameId, gameSlug });
 
   const state = generateRandomString(32);
   const codeVerifier = generateRandomString(64);
@@ -77,10 +91,10 @@ export async function startXAuth(gameId: string, gameSlug: string) {
   const cookieStore = await cookies();
   cookieStore.set('x_auth_state', fullState, cookieOptions);
   cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
-  console.log('Cookies set', {
-    x_auth_state: fullState.substring(0, 20) + '...',
-    x_code_verifier: codeVerifier.substring(0, 20) + '...',
-  });
+  // console.log('Cookies set', {
+  //   x_auth_state: fullState.substring(0, 20) + '...',
+  //   x_code_verifier: codeVerifier.substring(0, 20) + '...',
+  // });
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -93,8 +107,55 @@ export async function startXAuth(gameId: string, gameSlug: string) {
   });
 
   const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
-  console.log('Redirecting to X.com auth URL', { authUrl: authUrl.substring(0, 100) + '...' });
+ // console.log('Redirecting to X.com auth URL', { authUrl: authUrl.substring(0, 100) + '...' });
   redirect(authUrl);
+}
+
+export async function getAuthUrl(gameId: string, gameSlug: string): Promise<string> {
+  const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+  const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
+
+  if (!CLIENT_ID) {
+    throw new Error('X.com client ID is not configured');
+  }
+
+  // Generate state and code verifier
+  const state = generateRandomString(32); // Assume this function exists
+  const codeVerifier = generateRandomString(64); // Assume this function exists
+  const codeChallenge = generateCodeChallenge(codeVerifier); // Assume this function exists
+  const fullState = `${state}|${gameId}|${gameSlug}`;
+
+  // Set cookies
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 30, // 30 minutes
+    path: '/',
+    sameSite: 'lax' as const,
+  };
+
+  const cookieStore = await cookies();
+  cookieStore.set('x_auth_state', fullState, cookieOptions);
+  cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
+
+  // console.log('Cookies set in getAuthUrl', {
+  //   x_auth_state: fullState.substring(0, 20) + '...',
+  //   x_code_verifier: codeVerifier.substring(0, 20) + '...',
+  // });
+
+  // Construct Twitter auth URL
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    scope: 'tweet.read users.read',
+    state: fullState,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+
+  const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+  return authUrl;
 }
 
 async function exchangeTokenWithRetry(
@@ -111,11 +172,11 @@ async function exchangeTokenWithRetry(
     throw new Error('X.com client credentials are not configured');
   }
 
-  console.log('Starting token exchange', { code: code.substring(0, 10) + '...', redirectUri });
+  // console.log('Starting token exchange', { code: code.substring(0, 10) + '...', redirectUri });
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`Token exchange attempt ${attempt} of ${retries}`);
+      // console.log(`Token exchange attempt ${attempt} of ${retries}`);
       const response = await fetch('https://api.twitter.com/2/oauth2/token', {
         method: 'POST',
         headers: {
@@ -133,7 +194,7 @@ async function exchangeTokenWithRetry(
       if (response.status === 429) {
         const delay = 1000 * Math.pow(2, attempt);
         console.warn(`Rate limited (429), retrying in ${delay}ms`, { attempt });
-        await setTimeout(delay);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
 
@@ -148,10 +209,10 @@ async function exchangeTokenWithRetry(
       }
 
       const tokenData = await response.json();
-      console.log('Token exchange successful', {
-        accessToken: tokenData.access_token.substring(0, 10) + '...',
-        tokenType: tokenData.token_type,
-      });
+      // console.log('Token exchange successful', {
+      //   accessToken: tokenData.access_token.substring(0, 10) + '...',
+      //   tokenType: tokenData.token_type,
+      // });
       return tokenData;
     } catch (error) {
       console.error(`Token exchange attempt ${attempt} failed`, {
@@ -165,168 +226,138 @@ async function exchangeTokenWithRetry(
   }
 }
 
-export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
+export async function handleXCallback(
+  code: string,
+  state: string,
+  storedState?: string,
+  codeVerifier?: string
+): Promise<AuthResult> {
+  const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+  const CLIENT_SECRET = process.env.X_CLIENT_SECRET;
+  const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
+
   try {
-    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-    const cookieStore = await cookies();
-    const storedStateCookie = cookieStore.get('x_auth_state')?.value;
-    const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
+    // console.log('Handling callback', {
+    //   code: code.substring(0, 10) + '...',
+    //   state: state.substring(0, 20) + '...',
+    // });
+    // console.log('Provided values', {
+    //   storedState: storedState?.substring(0, 20) + '...',
+    //   codeVerifier: codeVerifier?.substring(0, 20) + '...',
+    // });
 
-    console.log('Handling callback', {
-      code: code.substring(0, 10) + '...',
-      state: state.substring(0, 20) + '...',
-    });
-    console.log('Stored cookies', {
-      x_auth_state: storedStateCookie?.substring(0, 20) + '...',
-      x_code_verifier: storedCodeVerifier?.substring(0, 20) + '...',
-    });
-
-    if (!storedCodeVerifier || !storedStateCookie) {
-      console.error('Missing required cookies', { storedStateCookie, storedCodeVerifier });
+    if (!storedState || !codeVerifier) {
+      console.error('Missing required values', { storedState, codeVerifier });
       return { success: false, error: 'missing_cookies' };
     }
 
-    if (storedStateCookie !== state) {
-      console.error('State validation failed', { receivedState: state, storedState: storedStateCookie });
+    if (state !== storedState) {
+      console.error('Invalid state parameter');
       return { success: false, error: 'invalid_state' };
     }
 
-    const [, gameId, gameSlug] = state.split('|');
-    console.log('Parsed state', { gameId, gameSlug });
+    const tokenData = await exchangeTokenWithRetry(code, codeVerifier, REDIRECT_URI);
 
-    console.log('Initiating token exchange');
-    const tokenData = await exchangeTokenWithRetry(code, storedCodeVerifier, REDIRECT_URI);
-
-    console.log('Fetching user info from X.com');
+    // Fetch user info (example)
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
     });
 
     if (!userResponse.ok) {
-      const errorText = await userResponse.text();
-      console.error('User info retrieval failed', {
-        status: userResponse.status,
-        statusText: userResponse.statusText,
-        errorText,
-      });
-      return { success: false, error: 'user_info_failed', userInfoError: errorText };
+      return { success: false, error: 'user_info_failed' };
     }
 
     const userData = await userResponse.json();
-    console.log('User info retrieved', { userId: userData.data.id, username: userData.data.username });
-
-    const xId = userData.data.id;
     const xHandle = userData.data.username;
 
-    if (gameId && gameSlug) {
-      console.log('Attempting to claim game', { gameId, gameSlug, xHandle });
-      const claimResult = await claimGame(gameId, xId, xHandle);
-      if (!claimResult.success) {
-        console.error('Game claim failed', { error: claimResult.error });
-        return { success: false, error: claimResult.error, gameSlug };
-      }
-      console.log('Game claimed successfully');
-      return { success: true, xHandle, gameSlug };
-    }
-
-    console.log('Authentication completed successfully', { xHandle });
-    return { success: true, xHandle };
+    // Extract gameSlug from state if needed (e.g., state is "random|gameId|gameSlug")
+    const [, , gameSlug] = state.split('|');
+   // console.log(xHandle, gameSlug);
+    return {
+      success: true,
+      xHandle,
+      gameSlug,
+      developerHandle: xHandle,
+    };
   } catch (error) {
-    console.error('Error in handleXCallback', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    return { success: false, error: 'callback_exception' };
+    console.error('X.com callback error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'unknown_error' 
+    };
   }
 }
 
-export async function processCallback(code: string, state: string): Promise<CallbackResult> {
+export async function processCallback(
+  code: string,
+  state: string,
+  storedState?: string,
+  codeVerifier?: string
+): Promise<CallbackResult> {
   try {
-    console.log('Processing callback', { code: code.substring(0, 10) + '...', state: state.substring(0, 20) + '...' });
-    const result = await handleXCallback(code, state);
+    const result = await handleXCallback(code, state, storedState, codeVerifier);
 
     if (!result.success) {
       let errorMessage = 'Authentication failed. Please try again.';
-      let errorType = result.error || 'unknown_error';
-      let errorDetails: any = {
-        originalError: result.error,
-        timestamp: new Date().toISOString(),
-        code: code.substring(0, 10) + '...',
-        state: state.substring(0, 20) + '...',
-      };
-
-      console.error('Callback processing failed', { errorType, errorDetails });
-
       switch (result.error) {
         case 'missing_cookies':
           errorMessage = 'Authentication session expired. Please try again.';
-          errorDetails.cookieInfo = 'Required cookies for authentication were not found';
           break;
         case 'invalid_state':
           errorMessage = 'Invalid authentication state. Please try again.';
-          errorDetails.stateInfo = 'The state parameter did not match the expected value';
           break;
         case 'token_exchange_failed':
           errorMessage = 'Failed to exchange token with X.com. Please try again.';
-          errorDetails.tokenInfo = result.tokenError || 'Unknown token exchange error';
           break;
         case 'user_info_failed':
           errorMessage = 'Failed to retrieve user information from X.com. Please try again.';
-          errorDetails.userInfoError = result.userInfoError || 'Unknown user info error';
           break;
         case 'already_claimed':
-          return { redirect: `/games?info=already_claimed`, errorType, errorDetails };
+          return { redirect: `/games?info=already_claimed` };
         case 'not_your_game':
-          errorDetails.gameSlug = result.gameSlug;
-          errorDetails.developerHandle = result.developerHandle;
-          if (result.gameSlug) {
+          const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
+          if (gameSlug) {
             return {
-              redirect: `/games/${result.gameSlug}?error=not_your_game&developer=${encodeURIComponent(result.developerHandle || '')}`,
-              errorType,
-              errorDetails,
+              redirect: `/games/${gameSlug}?error=not_your_game&developer=${encodeURIComponent(
+                result.developerHandle || ''
+              )}`,
             };
           }
-          return { redirect: `/games?error=not_your_game`, errorType, errorDetails };
+          return { redirect: `/games?error=not_your_game` };
       }
-
-      return { error: errorMessage, errorType, errorDetails };
+      return { error: errorMessage };
     }
 
     const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
-    const redirectUrl = gameSlug
-      ? `/games/${gameSlug}?success=game-claimed&handle=${encodeURIComponent(result.xHandle || '')}`
-      : `/?auth=success&handle=${encodeURIComponent(result.xHandle || '')}`;
-    console.log('Callback processed successfully, redirecting', { redirectUrl });
-    return { redirect: redirectUrl };
-  } catch (error) {
-    console.error('Error processing callback', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    const errorDetails = {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : 'Unknown',
-      timestamp: new Date().toISOString(),
-      code: code.substring(0, 10) + '...',
-      state: state.substring(0, 20) + '...',
-    };
+    if (gameSlug) {
+      return {
+        redirect: `/games/${gameSlug}?success=game-claimed&handle=${encodeURIComponent(
+          result.xHandle || ''
+        )}`,
+      };
+    }
+
     return {
-      error: error instanceof Error ? error.message : 'An unexpected error occurred during authentication.',
-      errorType: 'callback_exception',
-      errorDetails,
+      redirect: `/?auth=success&handle=${encodeURIComponent(result.xHandle || '')}`,
+    };
+  } catch (error) {
+    console.error('Error processing callback:', error);
+    return { 
+      error: error instanceof Error ? error.message : 'An unexpected error occurred during authentication.' 
     };
   }
 }
 
 export async function claimGame(gameId: string, xId: string, xHandle: string): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('Claiming game', { gameId, xId, xHandle });
+  //  console.log('Claiming game', { gameId, xId, xHandle });
     const supabase = createServerSupabaseClient();
 
     const { data: game, error: gameError } = await supabase
       .from('games')
-      .select('id, title, claimed')
+      .select('id, title, claimed, developer_url')
       .eq('id', gameId)
       .single();
 
@@ -335,14 +366,39 @@ export async function claimGame(gameId: string, xId: string, xHandle: string): P
       return { success: false, error: 'Game not found' };
     }
 
+    // If the game is already claimed, check if it's claimed by the same developer
     if (game.claimed) {
-      console.error('Game already claimed', { gameId, title: game.title });
-      return { success: false, error: 'already_claimed' };
+     // console.log('Game already claimed, checking developer', { gameId, title: game.title });
+      
+      // Extract the handle from the developer URL
+      const expectedHandle = extractHandleFromUrl(game.developer_url || '');
+      
+      // If the handles match, consider this a success (re-authentication)
+      if (expectedHandle && expectedHandle.toLowerCase() === xHandle.toLowerCase()) {
+       // console.log('Game already claimed by the same developer, updating timestamp', { gameId, xHandle });
+        
+        // Update the updated_at timestamp to show recent activity
+        const { error: updateError } = await supabase
+          .from('games')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', gameId);
+          
+        if (updateError) {
+          console.error('Error updating timestamp', { error: updateError.message });
+          // Not a critical error, still consider it a success
+        }
+        
+        return { success: true };
+      } else {
+        console.error('Game already claimed by another developer', { gameId, title: game.title });
+        return { success: false, error: 'already_claimed_by_another' };
+      }
     }
 
+    // If not claimed yet, claim it
     const { error: updateError } = await supabase
       .from('games')
-      .update({ claimed: true, developer_handle: xHandle, updated_at: new Date().toISOString() })
+      .update({ claimed: true })
       .eq('id', gameId);
 
     if (updateError) {
@@ -350,7 +406,7 @@ export async function claimGame(gameId: string, xId: string, xHandle: string): P
       return { success: false, error: 'Failed to claim game' };
     }
 
-    console.log('Game claimed successfully', { gameId, xHandle });
+   // console.log('Game claimed successfully', { gameId, xHandle });
     return { success: true };
   } catch (error) {
     console.error('Error claiming game', {
@@ -373,584 +429,107 @@ function extractHandleFromUrl(url: string): string | null {
   }
 }
 
-// // src/actions/auth-actions.ts
-// 'use server';
-
-// import { cookies } from 'next/headers';
-// import { redirect } from 'next/navigation';
-// import { createClient } from '@supabase/supabase-js';
-// import crypto from 'crypto';
-// import { setTimeout } from 'timers/promises';
-
-// // Create a Supabase client with the service role key (server-side only)
-// const createServerSupabaseClient = () => {
-//   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-//   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
-//   if (!supabaseUrl || !supabaseServiceKey) {
-//     throw new Error('Supabase URL or service key is not configured');
-//   }
-
-//   return createClient(supabaseUrl, supabaseServiceKey, {
-//     auth: {
-//       autoRefreshToken: false,
-//       persistSession: false,
-//     },
-//   });
-// };
-
-// // Helper function to generate a random string
-// function generateRandomString(length: number): string {
-//   return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
-// }
-
-// // Helper function to create a SHA-256 hash and base64url encode it
-// function generateCodeChallenge(verifier: string): string {
-//   const hash = crypto.createHash('sha256').update(verifier).digest();
-//   return hash
-//     .toString('base64')
-//     .replace(/\+/g, '-')
-//     .replace(/\//g, '_')
-//     .replace(/=+$/, '');
-// }
-
-// export type AuthResult = {
-//   success: boolean;
-//   xHandle?: string;
-//   error?: string;
-//   gameSlug?: string;
-//   developerHandle?: string;
-//   tokenError?: string;
-//   userInfoError?: string;
-// };
-
-// // interface AuthResult {
-// //   success: boolean;
-// //   xHandle?: string;
-// //   gameSlug?: string;
-// //   error?: string;
-// //   userInfoError?: string;
-// // }
-
-// export type CallbackResult = {
-//   error?: string;
-//   redirect?: string;
-//   errorDetails?: any;
-//   errorType?: string;
-// };
-
-// export async function startXAuth(gameId: string, gameSlug: string) {
-//   const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-//   const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-
-//   if (!CLIENT_ID) {
-//     throw new Error('X.com client ID is not configured');
-//   }
-
-//   // Generate random state and codeVerifier
-//   const state = generateRandomString(32);
-//   const codeVerifier = generateRandomString(64);
-//   const codeChallenge = generateCodeChallenge(codeVerifier);
-
-//   // Define cookie options
-//   const cookieOptions = {
-//     httpOnly: true,
-//     secure: process.env.NODE_ENV === 'production',
-//     maxAge: 60 * 30, // 30 minutes
-//     path: '/',
-//     sameSite: 'lax' as const,
-//   };
-
-//   // Store the full state (including gameId and gameSlug)
-//   const fullState = `${state}|${gameId}|${gameSlug}`;
-//   const cookieStore = await cookies();
-//   cookieStore.set('x_auth_state', fullState, cookieOptions);
-//   cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
-
-//   // Construct the authorization URL
-//   const params = new URLSearchParams({
-//     response_type: 'code',
-//     client_id: CLIENT_ID,
-//     redirect_uri: REDIRECT_URI,
-//     scope: 'tweet.read users.read',
-//     state: fullState,
-//     code_challenge: codeChallenge,
-//     code_challenge_method: 'S256',
-//   });
-
-//   const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
-//   redirect(authUrl);
-// }
-
-// /**
-//  * Start X.com authentication flow
-//  */
-// // export async function startXAuth(gameId: string, gameSlug: string) {
-// //   const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-// //   const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-
-// //   if (!CLIENT_ID) {
-// //     throw new Error('X.com client ID is not configured');
-// //   }
-
-// //   const state = generateRandomString(32);
-// //   const codeVerifier = generateRandomString(64);
-// //   const codeChallenge = generateCodeChallenge(codeVerifier);
-
-// //   const cookieOptions = {
-// //     httpOnly: true,
-// //     secure: process.env.NODE_ENV === 'production',
-// //     maxAge: 60 * 30, // Increased to 30 minutes to prevent expiration
-// //     path: '/',
-// //     sameSite: 'lax' as const,
-// //   };
-
-// //   // Get the cookies store and await it
-// //   const cookieStore = await cookies();
-  
-// //   // Set cookies using the resolved cookie store
-// //   cookieStore.set('x_auth_state', state, cookieOptions);
-// //   cookieStore.set('x_code_verifier', codeVerifier, cookieOptions);
-
-// //   if (gameId && gameSlug) {
-// //     cookieStore.set('game_to_claim', gameId, cookieOptions);
-// //     cookieStore.set('game_to_claim_slug', gameSlug, cookieOptions);
-// //   }
-
-// //   const params = new URLSearchParams({
-// //     response_type: 'code',
-// //     client_id: CLIENT_ID,
-// //     redirect_uri: REDIRECT_URI,
-// //     scope: 'tweet.read users.read',
-// //     state,
-// //     code_challenge: codeChallenge,
-// //     code_challenge_method: 'S256',
-// //   });
-
-// //   const authUrl = `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
-// //   redirect(authUrl);
-// // }
 
 
-// /**
-//  * Exchange token with retry logic for rate limiting
-//  */
-// async function exchangeTokenWithRetry(
-//   code: string,
-//   codeVerifier: string,
-//   redirectUri: string,
-//   retries: number = 3
-// ) {
-//   const CLIENT_ID = process.env.NEXT_PUBLIC_X_CLIENT_ID;
-//   const CLIENT_SECRET = process.env.X_CLIENT_SECRET;
+export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
+  try {
+  //  console.log('Verifying and claiming game with Auth.js', { gameId, gameSlug });
+    
+    // Get the current session from Auth.js
+    const session = await auth();
+    
+    if (!session?.user?.xId || !session?.user?.xHandle) {
+      console.error('User not authenticated or missing X.com data');
+      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`);
+    }
 
-//   if (!CLIENT_ID || !CLIENT_SECRET) {
-//     throw new Error('X.com client credentials are not configured');
-//   }
+    // Type assertion to let TypeScript know these values are definitely strings after the null check
+    const xId = session.user.xId as string;
+    const xHandle = session.user.xHandle as string;
+    
+   // console.log('User authenticated with Auth.js', { xId, xHandle });
 
-//   for (let attempt = 1; attempt <= retries; attempt++) {
-//     try {
-//       const response = await fetch('https://api.twitter.com/2/oauth2/token', {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/x-www-form-urlencoded',
-//           Authorization: `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`,
-//         },
-//         body: new URLSearchParams({
-//           code,
-//           grant_type: 'authorization_code',
-//           redirect_uri: redirectUri,
-//           code_verifier: codeVerifier,
-//         }).toString(),
-//       });
+    // Get the game from the database
+    const supabase = createServerSupabaseClient();
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .select('developer_url, claimed')
+      .eq('id', gameId)
+      .single();
 
-//       if (response.status === 429) {
-//         const delay = 1000 * Math.pow(2, attempt);
-//         console.log(`Rate limited, retrying in ${delay}ms...`);
-//         await setTimeout(delay);
-//         continue;
-//       }
+    if (gameError || !game) {
+      console.error('Error fetching game:', gameError);
+      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`);
+    }
 
-//       if (!response.ok) {
-//         const errorText = await response.text();
-//         console.error('Token exchange error:', errorText);
-//         throw new Error('token_exchange_failed');
-//       }
+    // Extract the Twitter handle from the developer URL
+    const developerUrl = game.developer_url || "";
+    const expectedHandle = extractHandleFromUrl(developerUrl);
+    
+    // console.log('Comparing handles', {
+    //   developerUrl,
+    //   expectedHandle,
+    //   userHandle: xHandle
+    // });
+    
+    if (!expectedHandle) {
+      console.error('Invalid developer URL', { developerUrl });
+      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`);
+    }
 
-//       return await response.json();
-//     } catch (error) {
-//       console.error(`Token exchange attempt ${attempt} failed:`, error);
-//       if (attempt === retries) throw error;
-//     }
-//   }
-// }
+    // Verify that the authenticated user's handle matches the developer URL
+    // Case-insensitive comparison of handles
+    if (expectedHandle.toLowerCase() !== xHandle.toLowerCase()) {
+      console.error('Handle mismatch', { 
+        expectedHandle, 
+        userHandle: xHandle 
+      });
+      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("not_your_game")}`);
+    }
 
-// /**
-//  * Handle X.com OAuth callback
-//  */
-// // export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
-// //   try {
-// //     // Parse state to extract original state, gameId, and gameSlug
-// //     const [storedState, gameId, gameSlug] = state.split('|');
-// //     if (!storedState) {
-// //       console.error('Invalid state format:', state);
-// //       return { success: false, error: 'invalid_state' };
-// //     }
+    // At this point, we've verified that the authenticated user is the developer
+    // So even if the game is already claimed, we should allow them to proceed
+    // The claimGame function will handle the case where the game is already claimed
 
-// //     // Retrieve codeVerifier and state from cookies
-// //     const cookieStore = await cookies();
-// //     const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
-// //     const storedStateCookie = cookieStore.get('x_auth_state')?.value;
-
-// //     // Validate cookies and state
-// //     if (!storedCodeVerifier || !storedStateCookie) {
-// //       console.error('Missing cookies:', { storedCodeVerifier, storedStateCookie });
-// //       return { success: false, error: 'missing_cookies' };
-// //     }
-
-// //     if (storedStateCookie !== storedState) {
-// //       console.error('State mismatch:', { storedStateCookie, storedState });
-// //       return { success: false, error: 'invalid_state' };
-// //     }
-
-// //     // Exchange code for tokens
-// //     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
-// //       method: 'POST',
-// //       headers: {
-// //         'Content-Type': 'application/x-www-form-urlencoded',
-// //         Authorization: `Basic ${Buffer.from(
-// //           `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
-// //         ).toString('base64')}`,
-// //       },
-// //       body: new URLSearchParams({
-// //         code,
-// //         grant_type: 'authorization_code',
-// //         client_id: process.env.TWITTER_CLIENT_ID || '',
-// //         redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-// //         code_verifier: storedCodeVerifier,
-// //       }).toString(),
-// //     });
-
-// //     if (!tokenResponse.ok) {
-// //       const errorText = await tokenResponse.text();
-// //       let tokenError;
-// //       try {
-// //         // Try to parse the error as JSON
-// //         tokenError = JSON.parse(errorText);
-// //       } catch (e) {
-// //         // If it's not valid JSON, use the raw text
-// //         tokenError = errorText;
-// //       }
+    // Claim the game using the existing function
+  //  console.log('Calling claimGame function with', { gameId, xId, xHandle });
+    const claimResult = await claimGame(gameId, xId, xHandle);
+    // console.log('claimGame result:', claimResult);
+    
+    if (!claimResult.success) {
+      console.error('Failed to claim game', { error: claimResult.error });
       
-// //       console.error('Token exchange error:', tokenError);
-// //       return { 
-// //         success: false, 
-// //         error: 'token_exchange_failed',
-// //         tokenError: typeof tokenError === 'object' ? JSON.stringify(tokenError) : String(tokenError)
-// //       };
-// //     }
-
-// //     const tokenData = await tokenResponse.json();
-// //     const accessToken = tokenData.access_token;
-
-// //     // Get user info
-// //     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
-// //       headers: {
-// //         Authorization: `Bearer ${accessToken}`,
-// //       },
-// //     });
-
-// //     if (!userResponse.ok) {
-// //       const errorText = await userResponse.text();
-// //       console.error('User info error:', errorText);
-// //       return { success: false, error: 'user_info_failed', userInfoError: errorText };
-// //     }
-
-// //     const userData = await userResponse.json();
-// //     const xId = userData.data.id;
-// //     const xHandle = userData.data.username;
-
-// //     // If gameId is provided, attempt to claim the game
-// //     if (gameId && gameSlug) {
-// //       const claimResult = await claimGame(gameId, xId, xHandle);
+      // If the error is that the game is already claimed by another developer,
+      // redirect with a specific error message
+      if (claimResult.error === 'already_claimed_by_another') {
+        return redirect(`/games/${gameSlug}?error=${encodeURIComponent("already_claimed_by_another")}`);
+      }
       
-// //       if (!claimResult.success) {
-// //         console.error('Game claim error:', claimResult.error);
-// //         return {
-// //           success: false,
-// //           error: claimResult.error,
-// //           gameSlug,
-// //         };
-// //       }
-      
-// //       return {
-// //         success: true,
-// //         xHandle,
-// //         gameSlug,
-// //       };
-// //     }
+      return redirect(`/games/${gameSlug}?error=${encodeURIComponent(claimResult.error || "update_failed")}`);
+    }
 
-// //     return {
-// //       success: true,
-// //       xHandle,
-// //     };
-// //   } catch (error) {
-// //     console.error('Error in handleXCallback:', error);
-// //     return { 
-// //       success: false, 
-// //       error: error instanceof Error ? error.name : 'unknown_error',
-// //     };
-// //   }
-// // }
-
-// export async function handleXCallback(code: string, state: string): Promise<AuthResult> {
-//   try {
-//     const REDIRECT_URI = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
-//     const cookieStore = await cookies();
-//     const storedStateCookie = cookieStore.get('x_auth_state')?.value;
-//     const storedCodeVerifier = cookieStore.get('x_code_verifier')?.value;
-
-//     // Log for debugging
-//     console.log('Callback received:', { code: code?.substring(0, 10) + '...', state });
-
-//     // Validate cookies
-//     if (!storedCodeVerifier || !storedStateCookie) {
-//       console.error('Missing required cookies:', { storedStateCookie, storedCodeVerifier });
-//       return { success: false, error: 'missing_cookies' };
-//     }
-
-//     // Validate state
-//     if (storedStateCookie !== state) {
-//       console.error('State validation failed:', { receivedState: state, storedState: storedStateCookie });
-//       return { success: false, error: 'invalid_state' };
-//     }
-
-//     // Extract gameId and gameSlug from state
-//     const [, gameId, gameSlug] = state.split('|');
-
-//     // Exchange code for access token
-//     const tokenData = await exchangeTokenWithRetry(code, storedCodeVerifier, REDIRECT_URI);
-
-//     // Fetch user information
-//     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
-//       headers: {
-//         Authorization: `Bearer ${tokenData.access_token}`,
-//       },
-//     });
-
-//     if (!userResponse.ok) {
-//       const errorText = await userResponse.text();
-//       console.error('User info error:', errorText);
-//       return { success: false, error: 'user_info_failed', userInfoError: errorText };
-//     }
-
-//     const userData = await userResponse.json();
-//     const xId = userData.data.id;
-//     const xHandle = userData.data.username;
-
-//     // Claim game if applicable
-//     if (gameId && gameSlug) {
-//       const claimResult = await claimGame(gameId, xId, xHandle);
-//       if (!claimResult.success) {
-//         console.error('Game claim error:', claimResult.error);
-//         return { success: false, error: claimResult.error, gameSlug };
-//       }
-//       return { success: true, xHandle, gameSlug };
-//     }
-
-//     return { success: true, xHandle };
-//   } catch (error) {
-//     console.error('Error in handleXCallback:', error);
-//     return { success: false, error: 'callback_exception' };
-//   }
-// }
-
-// /**
-//  * Process the OAuth callback
-//  */
-// export async function processCallback(code: string, state: string): Promise<CallbackResult> {
-//   try {
-//     const result = await handleXCallback(code, state);
-
-//     if (!result.success) {
-//       let errorMessage = 'Authentication failed. Please try again.';
-//       let errorType = result.error || 'unknown_error';
-//       let errorDetails: any = { 
-//         originalError: result.error,
-//         timestamp: new Date().toISOString(),
-//         code: code ? `${code.substring(0, 10)}...` : 'Missing',
-//         state: state ? `${state.substring(0, 10)}...` : 'Missing',
-//       };
-
-//       switch (result.error) {
-//         case 'missing_cookies':
-//           errorMessage = 'Authentication session expired. Please try again.';
-//           errorDetails.cookieInfo = 'Required cookies for authentication were not found';
-//           break;
-//         case 'invalid_state':
-//           errorMessage = 'Invalid authentication state. Please try again.';
-//           errorDetails.stateInfo = 'The state parameter did not match the expected value';
-//           break;
-//         case 'token_exchange_failed':
-//           errorMessage = 'Failed to exchange token with X.com. Please try again.';
-//           errorDetails.tokenInfo = result.tokenError || 'Unknown token exchange error';
-//           break;
-//         case 'user_info_failed':
-//           errorMessage = 'Failed to retrieve user information from X.com. Please try again.';
-//           errorDetails.userInfoError = result.userInfoError || 'Unknown user info error';
-//           break;
-//         case 'already_claimed':
-//           return { 
-//             redirect: `/games?info=already_claimed`,
-//             errorType,
-//             errorDetails
-//           };
-//         case 'not_your_game':
-//           const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
-//           errorDetails.gameSlug = gameSlug;
-//           errorDetails.developerHandle = result.developerHandle;
-          
-//           if (gameSlug) {
-//             return {
-//               redirect: `/games/${gameSlug}?error=not_your_game&developer=${encodeURIComponent(
-//                 result.developerHandle || ''
-//               )}`,
-//               errorType,
-//               errorDetails
-//             };
-//           }
-//           return { 
-//             redirect: `/games?error=not_your_game`,
-//             errorType,
-//             errorDetails
-//           };
-//       }
-
-//       return { 
-//         error: errorMessage,
-//         errorType,
-//         errorDetails
-//       };
-//     }
-
-//     const gameSlug = result.gameSlug || (await cookies()).get('game_to_claim_slug')?.value;
-//     if (gameSlug) {
-//       return {
-//         redirect: `/games/${gameSlug}?success=game-claimed&handle=${encodeURIComponent(
-//           result.xHandle || ''
-//         )}`,
-//       };
-//     }
-
-//     return {
-//       redirect: `/?auth=success&handle=${encodeURIComponent(result.xHandle || '')}`,
-//     };
-//   } catch (error) {
-//     console.error('Error processing callback:', error);
+    // As a backup, also call the direct database function to ensure claimed status is set
+  //  console.log('Calling update_game_claimed_status function with', { gameId });
+    const { error: functionError } = await supabase.rpc('update_game_claimed_status', {
+      game_id: gameId
+    });
     
-//     // Create detailed error information
-//     const errorDetails = {
-//       message: error instanceof Error ? error.message : String(error),
-//       stack: error instanceof Error ? error.stack : undefined,
-//       name: error instanceof Error ? error.name : 'Unknown',
-//       timestamp: new Date().toISOString(),
-//       code: code ? `${code.substring(0, 10)}...` : 'Missing',
-//       state: state ? `${state.substring(0, 10)}...` : 'Missing'
-//     };
-    
-//     return { 
-//       error: error instanceof Error ? error.message : 'An unexpected error occurred during authentication.',
-//       errorType: error instanceof Error ? error.name : 'UnknownError',
-//       errorDetails
-//     };
-//   }
-// }
+    if (functionError) {
+      console.error('Error calling update function:', functionError);
+      // Don't return error here, as the previous update might have succeeded
+    } else {
+     // console.log('Successfully called update_game_claimed_status function');
+    }
 
-// /**
-//  * Claim a game as the developer
-//  */
-// export async function claimGame(
-//   gameId: string,
-//   xHandle: string,
-//   gameSlug: string
-// ): Promise<{ success: boolean; error?: string }> {
-//   try {
-//     console.log(`Attempting to claim game ${gameId} for developer ${xHandle}`);
-    
-//     // Use the service role client for administrative operations
-//     const supabase = createServerSupabaseClient();
-    
-//     // First, check if the game exists and is not already claimed
-//     const { data: game, error: gameError } = await supabase
-//       .from('games')
-//       .select('id, title, claimed')
-//       .eq('id', gameId)
-//       .single();
-    
-//     if (gameError) {
-//       console.error('Error fetching game:', gameError);
-//       return { success: false, error: 'Game not found' };
-//     }
-    
-//     if (game.claimed) {
-//       console.error('Game already claimed:', game);
-//       return { success: false, error: 'This game has already been claimed by a developer' };
-//     }
-    
-//     // Update the game's claimed status and developer handle
-//     const { error: updateError } = await supabase
-//       .from('games')
-//       .update({
-//         claimed: true,
-//         developer_handle: xHandle,
-//         updated_at: new Date().toISOString(),
-//       })
-//       .eq('id', gameId);
-    
-//     if (updateError) {
-//       console.error('Error updating game:', updateError);
-//       return { success: false, error: 'Failed to claim game' };
-//     }
-    
-//     // As a backup, also call the direct database function to ensure claimed status is set
-//     const { error: functionError } = await supabase.rpc('update_game_claimed_status', {
-//       p_game_id: gameId,
-//       p_developer_handle: xHandle
-//     });
-    
-//     if (functionError) {
-//       console.error('Error calling update function:', functionError);
-//       // Don't return error here, as the previous update might have succeeded
-//     }
-    
-//     console.log(`Successfully claimed game ${gameId} for developer ${xHandle}`);
-//     return { success: true };
-//   } catch (error) {
-//     console.error('Error claiming game:', error);
-//     return { 
-//       success: false, 
-//       error: error instanceof Error ? error.message : 'An unexpected error occurred' 
-//     };
-//   }
-// }
-
-// /**
-//  * Extract X handle from URL
-//  */
-// function extractHandleFromUrl(url: string): string | null {
-//   if (!url) return null;
-
-//   try {
-//     let urlObj: URL;
-//     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-//       urlObj = new URL(`https://${url}`);
-//     } else {
-//       urlObj = new URL(url);
-//     }
-//     const path = urlObj.pathname.replace(/^\//, '');
-//     return path.split('/')[0] || null;
-//   } catch (error) {
-//     const match = url.match(/(?:x\.com|twitter\.com)\/([^\/\?]+)/i);
-//     return match ? match[1] : null;
-//   }
-// }
+    // Success - redirect back to the game page with success parameter
+    const redirectUrl = `/games/${gameSlug}?success=game-claimed`;
+    // console.log('Game claimed successfully, redirecting to:', redirectUrl);
+    return redirect(redirectUrl);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error; // Re-throw NEXT_REDIRECT error to let Next.js handle it
+    }
+    console.error('Error in verifyAndClaimGame:', error);
+    return redirect(`/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`);
+  }
+}

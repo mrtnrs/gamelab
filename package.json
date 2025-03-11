@@ -18,7 +18,7 @@
     "@supabase/ssr": "^0.0.10",
     "@supabase/supabase-js": "^2.49.1",
     "@types/crypto-js": "^4.2.2",
-    "@types/node": "^20",
+    "@types/node": "^20.17.24",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.0.1",
@@ -29,6 +29,7 @@
     "eslint-config-next": "^15.2.0",
     "framer-motion": "^12.4.10",
     "next": "^15.2.0",
+    "next-auth": "^5.0.0-beta.25",
     "next-themes": "^0.2.1",
     "postcss": "^8",
     "react": "^19.0.0",
@@ -41,5 +42,8 @@
     "url": "^0.11.4",
     "vercel": "^35.0.0",
     "wrangler": "^3.22.1"
-  }
+  },
+  "browser": {
+    "crypto": false
+}
 }

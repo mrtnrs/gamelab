@@ -1,8 +1,6 @@
-"use client";
-
 import { Game } from '@/types/game';
 import { Changelog as ServiceChangelog } from '@/services/game-service';
-import ChangelogManagerClient from '@/components/changelog-manager-client';
+import ChangelogManager from '@/components/changelog-manager';
 import GameRating from '@/components/game-rating';
 
 interface Changelog {
@@ -24,6 +22,7 @@ interface GameOverviewProps {
   userRating: number | null;
   handleRateGame: (rating: number) => Promise<void>;
 }
+
 
 export default function GameOverview({
   formattedGame,
@@ -65,6 +64,13 @@ export default function GameOverview({
       return formattedGame.year;
     }
   })();
+
+  if (!formattedGame || !formattedGame.id) {
+    console.error('GameOverview: formattedGame is invalid', formattedGame);
+    return <div>Game not found</div>;
+  }
+
+  
   
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
@@ -95,12 +101,16 @@ export default function GameOverview({
                 </p>
               </div>
             )}
-            <ChangelogManagerClient
-              gameId={formattedGame.id}
-              isGameDeveloper={isGameDeveloper}
-              initialChangelogs={clientChangelogs}
-              initialError={null}
-            />
+            {/* Debug info for development troubleshooting */}
+            {/* Use the server component which will handle authentication verification */}
+            {formattedGame.id && (
+          <ChangelogManager
+            gameId={formattedGame.id}
+            isGameDeveloper={isGameDeveloper}
+            clientChangelogs={initialChangelogs}
+            error={null} // Add error handling if needed
+          />
+            )}
           </div>
         )}
       </div>

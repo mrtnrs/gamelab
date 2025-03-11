@@ -6,6 +6,17 @@ import { FiPlus, FiEdit2, FiTrash2, FiChevronDown, FiChevronUp, FiCalendar, FiTa
 import { toast } from 'react-hot-toast';
 import Script from 'next/script';
 
+interface ClientChangelog {
+  id: string;
+  game_id: string;
+  title: string;
+  content: string;
+  version?: string;
+  created_at: string;
+  updated_at?: string;
+  tweet_id?: string;
+}
+
 // Define Twitter interface for TypeScript
 interface TwitterWidgets {
   widgets: {
@@ -23,19 +34,8 @@ declare global {
 interface ChangelogManagerClientProps {
   gameId: string;
   isGameDeveloper: boolean;
-  initialChangelogs: Changelog[];
-  initialError: string | null;
-}
-
-interface Changelog {
-  id: string;
-  game_id: string;
-  title: string;
-  content: string;
-  version?: string;
-  created_at: string;
-  updated_at?: string;
-  tweet_id?: string;
+  initialChangelogs: ClientChangelog[];
+  initialError: string | null | undefined;
 }
 
 export default function ChangelogManagerClient({
@@ -44,7 +44,7 @@ export default function ChangelogManagerClient({
   initialChangelogs,
   initialError,
 }: ChangelogManagerClientProps) {
-  const [changelogs, setChangelogs] = useState<Changelog[]>(initialChangelogs);
+  const [changelogs, setChangelogs] = useState<ClientChangelog[]>(initialChangelogs);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,14 +53,13 @@ export default function ChangelogManagerClient({
   const [content, setContent] = useState('');
   const [version, setVersion] = useState('');
   const [tweetUrl, setTweetUrl] = useState('');
-  const [error, setError] = useState<string | null>(initialError);
+  const [error, setError] = useState<string | null>(initialError || null);
   const [expandedChangelogs, setExpandedChangelogs] = useState<Record<string, boolean>>({});
   const [twitterScriptLoaded, setTwitterScriptLoaded] = useState(false);
 
   // Handle initial error
   useEffect(() => {
     if (initialError) {
-      console.log('ChangelogManagerClient: Initial error:', initialError);
       setLoading(false);
       setError(initialError);
     }
@@ -82,7 +81,7 @@ export default function ChangelogManagerClient({
     setIsModalOpen(true);
   };
 
-  const handleEditChangelog = (changelog: Changelog) => {
+  const handleEditChangelog = (changelog: ClientChangelog) => {
     setTitle(changelog.title);
     setContent(changelog.content);
     setVersion(changelog.version || '');

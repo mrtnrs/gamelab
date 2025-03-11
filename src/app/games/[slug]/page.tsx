@@ -1,10 +1,11 @@
 // src/app/games/[slug]/page.tsx
 import GameDetailClient from './game-detail-client';
-import { gameService } from '@/services/game-service';
+import { gameService, Changelog } from '@/services/game-service';
 import { Metadata, ResolvingMetadata } from 'next';
 import { generateSlug } from '@/utils/slug';
 import { supabase } from '@/utils/supabase';
 import { cookies } from 'next/headers';
+import { auth } from '@/auth';
 
 // Helper function to extract handle from URL
 function extractHandleFromUrl(url: string): string | null {
@@ -94,27 +95,47 @@ export default async function GamePage({ params }: Props) {
     return <div>Game not found</div>;
   }
 
-  // Fetch changelogs
-  const changelogs = await gameService.getChangelogs(game.id);
-
-  // Check if user is the developer
-  let isGameDeveloper = false;
-  if (game.claimed) {
-    const cookieStore = await cookies();
-    const xHandle = cookieStore.get('x_handle')?.value;
-    if (xHandle) {
-      const gameDeveloperHandle = game.developer_url ? extractHandleFromUrl(game.developer_url) : '';
-      if (gameDeveloperHandle && gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
-        isGameDeveloper = true;
-      }
-    }
+  // Fetch changelogs and handle errors
+  let changelogs: Changelog[] = [];
+  try {
+    changelogs = await gameService.getChangelogs(game.id);
+    changelogs = changelogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch (err) {
+    console.error('Error fetching changelogs:', err);
   }
+
+  // Check if user is the developer - IMPROVED ALGORITHM
+  let isGameDeveloper = false;
+  
+  // Get the session and user handle
+  const session = await auth(); // Use your auth helper
+  const xHandle = session?.user?.xHandle;
+  
+  // Get developer handle from the game's developer URL
+  const gameDeveloperHandle = extractHandleFromUrl(game.developer_url || '');
+  
+  
+  // Check if handles match (case insensitive)
+  if (xHandle && gameDeveloperHandle && 
+      gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
+    isGameDeveloper = true;
+  }
+  
+
+  // Adapt changelogs for the client component
+  const clientChangelogs: Changelog[] = changelogs.map(changelog => ({
+    id: changelog.id,
+    title: changelog.title,
+    content: changelog.content,
+    version: changelog.version,
+    date: changelog.date
+  }));
 
   return (
     <GameDetailClient
       game={game}
       slug={slug}
-      initialChangelogs={changelogs}
+      initialChangelogs={clientChangelogs}
       isGameDeveloper={isGameDeveloper}
       userRating={null}
       comments={[]}
@@ -140,7 +161,6 @@ export async function generateStaticParams(): Promise<{ slug: string }[]> {
       return [];
     }
 
-    console.log(`Generating static paths for ${games.length} games`);
 
     return games.map((game) => ({
       slug: generateSlug(game.title),

@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
  */
 export async function fixGameClaimedStatus(gameId: string): Promise<boolean> {
   try {
-    console.log(`Attempting to fix claimed status for game ${gameId} using direct SQL`);
+   // console.log(`Attempting to fix claimed status for game ${gameId} using direct SQL`);
     
     // Use the service role client for administrative operations
     const serviceRoleSupabase = createClient(
@@ -34,7 +34,7 @@ export async function fixGameClaimedStatus(gameId: string): Promise<boolean> {
       console.error('Error executing SQL:', error);
       
       // Fallback to regular update if RPC fails
-      console.log('Falling back to regular update');
+     // console.log('Falling back to regular update');
       const { error: updateError } = await serviceRoleSupabase
         .from('games')
         .update({ claimed: true })
@@ -45,7 +45,7 @@ export async function fixGameClaimedStatus(gameId: string): Promise<boolean> {
         return false;
       }
     } else {
-      console.log('SQL update result:', data);
+     // console.log('SQL update result:', data);
     }
     
     // Verify the update
@@ -60,7 +60,7 @@ export async function fixGameClaimedStatus(gameId: string): Promise<boolean> {
       return false;
     }
     
-    console.log('Verification result:', verifyData);
+  //  console.log('Verification result:', verifyData);
     return verifyData?.claimed === true;
     
   } catch (error) {

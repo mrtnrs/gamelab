@@ -107,7 +107,7 @@ export const gameService = {
       
       // Filter games by category name (case-insensitive)
       const categoryName = categoryData.name.toLowerCase();
-      console.log(`Filtering games by category name (case-insensitive): ${categoryName}`);
+    //  console.log(`Filtering games by category name (case-insensitive): ${categoryName}`);
       
       const filteredGames = data.filter(game => {
         // Handle both direct category_id match and case-insensitive category name match
@@ -117,7 +117,7 @@ export const gameService = {
         return matchesById || matchesByName;
       });
       
-      console.log(`Found ${filteredGames.length} games in category ${categoryData.name}`);
+    //  console.log(`Found ${filteredGames.length} games in category ${categoryData.name}`);
       return filteredGames || [];
     } catch (error) {
       console.error('Error in getGamesByCategory:', error);
@@ -157,7 +157,7 @@ export const gameService = {
         return null;
       }
 
-      console.log(`[getGameBySlug] Looking for game with slug: ${slug}`);
+    //  console.log(`[getGameBySlug] Looking for game with slug: ${slug}`);
       
       // Get all published games
       const { data: allGames, error } = await supabase
@@ -175,7 +175,7 @@ export const gameService = {
         return null;
       }
 
-      console.log(`[getGameBySlug] Found ${allGames.length} published games`);
+    //  console.log(`[getGameBySlug] Found ${allGames.length} published games`);
       
       // First pass: Try to find an exact match by title-generated slug
       const generatedSlug = generateSlug(slug);
@@ -227,7 +227,7 @@ export const gameService = {
       }
       
       if (matchedGame) {
-        console.log(`[getGameBySlug] Successfully found game: ${matchedGame.title}`);
+       // console.log(`[getGameBySlug] Successfully found game: ${matchedGame.title}`);
         
         // Get the most up-to-date game data directly from the database
         const { data: freshGameData, error: freshError } = await supabase
@@ -936,7 +936,7 @@ export const gameService = {
   
   async getSimilarGames(gameId: string, tags: string[], limit: number = 5): Promise<Game[]> {
     try {
-      console.log('getSimilarGames called with gameId:', gameId, 'tags:', tags, 'limit:', limit);
+      //console.log('getSimilarGames called with gameId:', gameId, 'tags:', tags, 'limit:', limit);
       let result: Game[] = [];
       
       // First try to find games with matching tags
@@ -953,14 +953,14 @@ export const gameService = {
         if (error) {
           console.error(`Error fetching similar games for game ${gameId}:`, error);
         } else if (data) {
-          console.log('Found games with matching tags:', data.length);
+         // console.log('Found games with matching tags:', data.length);
           result = data;
         }
       }
       
       // If we don't have enough games with matching tags, get some popular games to fill the list
       if (result.length < limit) {
-        console.log('Not enough games with matching tags, fetching popular games');
+       // console.log('Not enough games with matching tags, fetching popular games');
         const remainingLimit = limit - result.length;
         const { data: popularGames, error: popularError } = await supabase
           .from('games')
@@ -972,7 +972,7 @@ export const gameService = {
           .limit(remainingLimit);
         
         if (!popularError && popularGames) {
-          console.log('Found popular games:', popularGames.length);
+         // console.log('Found popular games:', popularGames.length);
           result = [...result, ...popularGames];
         } else if (popularError) {
           console.error('Error fetching popular games:', popularError);
@@ -981,7 +981,7 @@ export const gameService = {
       
       // If we still don't have enough games, get random games to reach the minimum limit
       if (result.length < limit) {
-        console.log('Still not enough games, fetching random games by created_at');
+       // console.log('Still not enough games, fetching random games by created_at');
         const remainingLimit = limit - result.length;
         const { data: randomGames, error: randomError } = await supabase
           .from('games')
@@ -993,7 +993,7 @@ export const gameService = {
           .limit(remainingLimit);
         
         if (!randomError && randomGames) {
-          console.log('Found random games by created_at:', randomGames.length);
+        //  console.log('Found random games by created_at:', randomGames.length);
           result = [...result, ...randomGames];
         } else if (randomError) {
           console.error('Error fetching random games by created_at:', randomError);
@@ -1002,7 +1002,7 @@ export const gameService = {
       
       // If we STILL don't have enough games, try one more approach with a different ordering
       if (result.length < limit) {
-        console.log('STILL not enough games, fetching any games');
+       // console.log('STILL not enough games, fetching any games');
         const remainingLimit = limit - result.length;
         const { data: moreRandomGames, error: moreRandomError } = await supabase
           .from('games')

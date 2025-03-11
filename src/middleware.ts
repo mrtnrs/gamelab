@@ -1,33 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
+export { auth as middleware } from "@/auth"
 
-export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname === "/auth/callback") {
-    const code = request.nextUrl.searchParams.get("code") || "";
-    const state = request.nextUrl.searchParams.get("state") || "";
-    const error = request.nextUrl.searchParams.get("error") || "";
+// import { NextRequest, NextResponse } from "next/server";
 
-    console.log("[Middleware] Extracted query params:", { code, state, error });
+// export function middleware(request: NextRequest) {
+//   if (request.nextUrl.pathname === "/auth/callback") {
+//     const code = request.nextUrl.searchParams.get("code") || "";
+//     const state = request.nextUrl.searchParams.get("state") || "";
+//     const error = request.nextUrl.searchParams.get("error") || "";
 
-    const newHeaders = new Headers(request.headers);
-    const cookieString = [
-      `x-oauth-code=${encodeURIComponent(code)}`,
-      `x-oauth-state=${encodeURIComponent(state)}`,
-      `x-oauth-error=${encodeURIComponent(error)}`,
-    ].join("; ");
-    newHeaders.set("cookie", cookieString);
+//     console.log("[Middleware] Extracted query params:", { code, state, error });
 
-    return NextResponse.next({
-      request: {
-        headers: newHeaders,
-      },
-    });
-  }
-  return NextResponse.next();
-}
+//     const newHeaders = new Headers(request.headers);
+//     const cookieString = [
+//       `x-oauth-code=${encodeURIComponent(code)}`,
+//       `x-oauth-state=${encodeURIComponent(state)}`,
+//       `x-oauth-error=${encodeURIComponent(error)}`,
+//     ].join("; ");
+//     newHeaders.set("cookie", cookieString);
 
-export const config = {
-  matcher: ["/auth/callback"],
-};
+//     return NextResponse.next({
+//       request: {
+//         headers: newHeaders,
+//       },
+//     });
+//   }
+//   return NextResponse.next();
+// }
+
+// export const config = {
+//   matcher: ["/auth/callback"],
+// };
 
 
 // import { NextRequest, NextResponse } from 'next/server';

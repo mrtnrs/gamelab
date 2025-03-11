@@ -19,7 +19,7 @@ export default function CallbackClient() {
         const code = searchParams.get('code');
         const state = searchParams.get('state');
 
-        console.log('Client-side callback parameters:', { code, state });
+      //  console.log('Client-side callback parameters:', { code, state });
         setDebugInfo({ code: code ? `${code.substring(0, 10)}...` : 'Missing', state: state ? `${state.substring(0, 10)}...` : 'Missing' });
 
         if (!code || !state) {

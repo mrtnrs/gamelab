@@ -1,7 +1,7 @@
 // src/app/games/[slug]/game-detail-client.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Game } from "@/types/game";
@@ -75,10 +75,19 @@ export default function GameDetailClient({
   game,
   slug,
   initialChangelogs,
-  isGameDeveloper,
+  isGameDeveloper: initialIsGameDeveloper,
   userRating: initialUserRating,
   comments: initialComments,
 }: GameDetailClientProps) {
+  // console.log('🔄 GameDetailClient rendering', { slug, claimed: game.claimed, isGameDeveloper: initialIsGameDeveloper });
+  
+  // Add render counter to track component renders
+  // const renderCount = useRef(0);
+  // useEffect(() => {
+  //   renderCount.current += 1;
+  //   console.log(`🔢 Render count: ${renderCount.current}`);
+  // });
+  
   const [formattedGame, setFormattedGame] = useState<FormattedGame>(formatGameForDisplay(game));
   const [selectedImage, setSelectedImage] = useState<string>(formattedGame.feature_image);
   const [userRating, setUserRating] = useState<number | null>(initialUserRating);
@@ -87,54 +96,209 @@ export default function GameDetailClient({
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const [similarGames, setSimilarGames] = useState<Game[]>([]);
   const [loadingSimilarGames, setLoadingSimilarGames] = useState(false);
+  const [hasFetchedSimilarGames, setHasFetchedSimilarGames] = useState(false);
+  const [hasHandledSuccess, setHasHandledSuccess] = useState(false);
+  // Keep track of URL parameters being processed to prevent duplicate processing
+  const [processedUrlParams, setProcessedUrlParams] = useState<{[key: string]: boolean}>({});
+  // Client-side game developer status determination
+  const [isGameDeveloper, setIsGameDeveloper] = useState<boolean>(initialIsGameDeveloper);
+  
   const canonicalUrl = `https://gamelab.vercel.app/games/${slug}`;
   const router = useRouter();
+  
+  // Track state changes
+  // useEffect(() => {
+  //   console.log('📊 State updated - formattedGame:', { 
+  //     id: formattedGame.id, 
+  //     claimed: formattedGame.claimed,
+  //     hasFetchedSimilarGames,
+  //     hasHandledSuccess,
+  //     isGameDeveloper
+  //   });
+  // }, [formattedGame, hasFetchedSimilarGames, hasHandledSuccess, isGameDeveloper]);
   
   // Mobile tabs state
   const [activeTab, setActiveTab] = useState('overview');
   const [isDesktop, setIsDesktop] = useState(false);
 
+  // Check for URL parameters on component mount - WITH FIX to prevent infinite loop
   useEffect(() => {
+   // console.log('🔍 URL parameter check effect running');
+    
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const success = urlParams.get('success');
+    
+  //  console.log('📝 URL parameters:', { error, success, hasHandledSuccess, processedUrlParams });
+    
+    // If there's a success parameter indicating successful game claiming
+    if (success === 'game-claimed') {
+      // Always set isGameDeveloper to true if success=game-claimed is present
+      // This ensures the user is recognized as the developer regardless of server-side state
+    //  console.log('🔑 Setting isGameDeveloper to true based on success parameter');
+      setIsGameDeveloper(true);
+    }
+    
+    // Handle error parameter
+    if (error && !processedUrlParams[`error-${error}`]) {
+    //  console.log('❌ Handling error parameter:', error);
+      
+      // Mark this error as processed to prevent reprocessing
+      setProcessedUrlParams(prev => ({...prev, [`error-${error}`]: true}));
+      
+      switch (error) {
+        case 'auth_failed':
+          toast.error('Authentication failed. Please try again.');
+          break;
+        case 'game_not_found':
+          toast.error('Game not found.');
+          break;
+        case 'invalid_developer_url':
+          toast.error('Invalid developer URL. Please add a valid Twitter/X URL to your game.');
+          break;
+        case 'not_your_game':
+          toast.error('The X handle in your profile does not match the game\'s developer URL.');
+          break;
+        case 'update_failed':
+          toast.error('Failed to claim the game. Please try again.');
+          break;
+        case 'already_claimed_by_another':
+          toast.error('This game has already been claimed by another developer.');
+          break;
+        default:
+          toast.error('An error occurred. Please try again.');
+          break;
+      }
+      
+      // Remove the error parameter from the URL
+      urlParams.delete('error');
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+    
+    // Handle success parameter - only if we haven't processed it already and game is not claimed
+    const successParam = success === 'game-claimed';
+    const needToProcess = successParam && !processedUrlParams['success-game-claimed'] && !hasHandledSuccess;
+    
+    if (needToProcess) {
+      // console.log('✅ Handling success parameter: game-claimed', { 
+      //   alreadyProcessed: processedUrlParams['success-game-claimed'],
+      //   hasHandledSuccess
+      // });
+      
+      // Mark this success as processed to prevent reprocessing
+      setProcessedUrlParams(prev => ({...prev, 'success-game-claimed': true}));
+      
+      // Only update claimed status if it's not already true
+      if (!formattedGame.claimed) {
+        handleGameClaimed();
+      } else {
+    //   console.log('✅ Game already claimed, skipping state update');
+        // Still need to mark as handled to prevent infinite loop
+        setHasHandledSuccess(true);
+      }
+      
+      // Remove the success parameter from the URL
+      urlParams.delete('success');
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [formattedGame.claimed, processedUrlParams]); // Remove hasHandledSuccess from dependencies 
+  
+  const handleGameClaimed = () => {
+    // console.log('🎮 handleGameClaimed called');
+    // console.log('🎮 Current claimed status:', formattedGame.claimed);
+    
+    // Only update if not already claimed to prevent unnecessary state updates
+    if (!formattedGame.claimed) {
+    //  console.log('🎮 Updating game claimed status to true');
+      // Update the game state to reflect the claimed status
+      setFormattedGame((prev) => ({ ...prev, claimed: true }));
+      
+      // Set the user as the game developer since they just claimed it
+      setIsGameDeveloper(true);
+      
+      // Force a page refresh to reload server components with new authentication state
+      window.location.href = window.location.pathname;
+    } else {
+     // console.log('🎮 Game already claimed, skipping state update');
+      // Even if already claimed, ensure developer status is true since they just authenticated
+      setIsGameDeveloper(true);
+    }
+    
+    // Mark as handled to prevent re-processing
+    setHasHandledSuccess(true);
+   // console.log('✅ Set hasHandledSuccess to true');
+    
+    // Show success toast (we can still show this even if we didn't update state)
+    toast.success('Game claimed successfully! You can now add changelogs.');
+  };
+
+  // Handle stored rating and initial setup - only runs once
+  useEffect(() => {
+    console.log('💾 Loading stored rating effect running');
     if (formattedGame.id) {
       const storedRating = localStorage.getItem(`game_rating_${formattedGame.id}`);
+     // console.log('💾 Stored rating for game', formattedGame.id, ':', storedRating);
       if (storedRating) {
         setUserRating(parseInt(storedRating, 10));
         setIsRatingSubmitted(true);
       }
     }
+  }, [formattedGame.id]); // Only depend on the ID, not the entire object
 
-    // Fetch similar games
-    const fetchSimilarGames = async () => {
-      setLoadingSimilarGames(true);
-      try {
-        const games = await gameService.getSimilarGames(formattedGame.id, formattedGame.tags || [], 5);
-        setSimilarGames(games);
-      } catch (error) {
-        console.error('Error fetching similar games:', error);
-        setSimilarGames([]);
-      } finally {
-        setLoadingSimilarGames(false);
+  // Fetch similar games separately, only once
+  useEffect(() => {
+    // console.log('🎲 Similar games effect running', { 
+    //   gameId: formattedGame.id, 
+    //   hasFetchedSimilarGames, 
+    //   tagCount: formattedGame.tags?.length 
+    // });
+    
+    if (formattedGame.id && !hasFetchedSimilarGames) {
+     // console.log('🎲 Fetching similar games...');
+      const fetchSimilarGames = async () => {
+        setLoadingSimilarGames(true);
+        try {
+          const games = await gameService.getSimilarGames(formattedGame.id, formattedGame.tags || [], 5);
+        //  console.log(`🎲 Fetched ${games.length} similar games`);
+          setSimilarGames(games);
+          setHasFetchedSimilarGames(true);
+        //  console.log('🎲 Set hasFetchedSimilarGames to true');
+        } catch (error) {
+          console.error('Error fetching similar games:', error);
+          setSimilarGames([]);
+        } finally {
+          setLoadingSimilarGames(false);
+        }
       }
+      fetchSimilarGames();
+    } else {
+      // console.log('🎲 Skipping similar games fetch', { 
+      //   hasId: !!formattedGame.id, 
+      //   alreadyFetched: hasFetchedSimilarGames 
+      // });
     }
-    fetchSimilarGames();
-  }, [formattedGame]);
+  }, [formattedGame.id, formattedGame.tags, hasFetchedSimilarGames]);
 
   // Check if desktop for responsive layout
   useEffect(() => {
-    const checkIfDesktop = () => setIsDesktop(window.innerWidth >= 768);
+   // console.log('📱 Responsive layout effect running');
+    const checkIfDesktop = () => {
+      const isDesktopNow = window.innerWidth >= 768;
+   //   console.log('📱 Device is desktop:', isDesktopNow);
+      setIsDesktop(isDesktopNow);
+    };
     checkIfDesktop();
     window.addEventListener('resize', checkIfDesktop);
     return () => window.removeEventListener('resize', checkIfDesktop);
   }, []);
 
-  const handleGameClaimed = () => {
-    setFormattedGame((prev) => (prev ? { ...prev, claimed: true } : prev));
-    toast.success('Game claimed successfully! You can now add changelogs.');
-  };
-
   const handleRateGame = async (rating: number) => {
     if (isRatingLoading) return;
 
+   // console.log('⭐ Submitting rating:', rating);
     setIsRatingLoading(true);
     try {
       await rateGame(formattedGame.id, rating);
@@ -151,6 +315,7 @@ export default function GameDetailClient({
           ? (prev.rating_average * prev.rating_count - userRating + rating) / prev.rating_count
           : (prev.rating_average * prev.rating_count + rating) / newCount;
         
+      //  console.log('⭐ Updated rating stats:', { newAverage, newCount });
         return {
           ...prev,
           rating_average: newAverage,
@@ -161,6 +326,7 @@ export default function GameDetailClient({
       toast.success('Rating submitted!');
       
       // Refresh the page to get updated data
+    //  console.log('⭐ Refreshing page for updated data');
       router.refresh();
     } catch (error) {
       console.error('Failed to rate game:', error);
@@ -171,6 +337,7 @@ export default function GameDetailClient({
   };
 
   const handleImageSelect = (image: string) => {
+   // console.log('🖼️ Selected image:', image);
     setSelectedImage(image);
   };
 

@@ -3,6 +3,7 @@ import { URL } from "url";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/components/auth-provider";
+import GameAuthProvider from "@/components/game-auth-provider";
 import { BookmarkProvider } from "@/contexts/bookmark-context";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
@@ -87,10 +88,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <BookmarkProvider>
-              {children}
-              
-            </BookmarkProvider>
+            <GameAuthProvider>
+              <BookmarkProvider>
+                {children}
+                
+              </BookmarkProvider>
+            </GameAuthProvider>
           </AuthProvider>
           <Toaster position="top-right" />
         </ThemeProvider>
