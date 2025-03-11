@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth";
 import { createServerSupabaseClient } from "@/utils/supabase-admin";
-import { redirect } from "next/navigation";
 
 /**
  * Verify if the authenticated user matches the game developer and claim the game
@@ -15,7 +14,11 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
     
     if (!session?.user?.xId || !session?.user?.xHandle) {
       // User is not authenticated
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`);
+      return { 
+        success: false, 
+        error: "auth_failed",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`
+      };
     }
 
     // Get the game from the database
@@ -28,12 +31,20 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
 
     if (error || !game) {
       console.error('Error fetching game:', error);
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`);
+      return { 
+        success: false, 
+        error: "game_not_found",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`
+      };
     }
 
     // Check if the game is already claimed
     // if (game.claimed && game.developer_twitter_id !== session.user.xId) {
-    //   return redirect(`/games/${gameSlug}?error=${encodeURIComponent("already_claimed")}`);
+    //   return { 
+    //     success: false, 
+    //     error: "already_claimed",
+    //     redirect: `/games/${gameSlug}?error=${encodeURIComponent("already_claimed")}`
+    //   };
     // }
 
     // Extract the Twitter handle from the developer URL
@@ -42,7 +53,11 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
       (developerUrl.includes("twitter.com/") || developerUrl.includes("x.com/"));
     
     if (!isXUrl) {
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`);
+      return { 
+        success: false, 
+        error: "invalid_developer_url",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`
+      };
     }
 
     // Extract the handle from the URL
@@ -52,7 +67,11 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
 
     // Verify that the authenticated user's handle matches the developer URL
     if (expectedHandle !== userHandle) {
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("handle-mismatch")}`);
+      return { 
+        success: false, 
+        error: "handle-mismatch",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("handle-mismatch")}`
+      };
     }
 
     // Update the game's claimed status
@@ -65,14 +84,25 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
 
     if (updateError) {
       console.error('Error updating game claimed status:', updateError);
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("update_failed")}`);
+      return { 
+        success: false, 
+        error: "update_failed",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("update_failed")}`
+      };
     }
 
-    // Success - redirect back to the game page with success parameter
-    return redirect(`/games/${gameSlug}?success=game-claimed`);
+    // Success - return success object
+    return { 
+      success: true, 
+      redirect: `/games/${gameSlug}?success=game-claimed`
+    };
   } catch (error) {
     console.error('Error in verifyAndClaimGame:', error);
-    return redirect(`/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`);
+    return { 
+      success: false, 
+      error: "unexpected_error",
+      redirect: `/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`
+    };
   }
 }
 
@@ -101,7 +131,7 @@ export async function isGameDeveloper(gameId: string): Promise<boolean> {
 
     return data.developer_twitter_id === session.user.xId;
   } catch (error) {
-    console.error('Error checking if user is developer:', error);
+    console.error('Error checking if user is game developer:', error);
     return false;
   }
 }
