@@ -32,7 +32,13 @@ interface TwitterProfile {
 }
 
 // Auth.js configuration
-export const { handlers, auth } = NextAuth({
+export const {
+	handlers: { GET, POST },
+	signIn,
+	signOut,
+	auth,
+} = NextAuth({
+  trustHost: true,
   providers: [
     Twitter({
       clientId: process.env.NEXT_PUBLIC_X_CLIENT_ID as string,
@@ -80,8 +86,6 @@ export const { handlers, auth } = NextAuth({
       return extendedSession;
     },
   },
-  // Use edge compatibility mode for Cloudflare
-  trustHost: true,
 })
 
 // Helper function to claim a game using the authenticated user
