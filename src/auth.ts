@@ -79,8 +79,6 @@ async function claimGame(gameId: string, xId: string, xHandle: string) {
       .from("games")
       .update({
         claimed: true,
-        claimed_by: xId,
-        claimed_by_handle: xHandle,
       })
       .eq("id", gameId)
       .select();
