@@ -10,7 +10,10 @@ import { signIn, signOut } from "next-auth/react";
  */
 export async function startAuthWithGameContext(gameId: string, gameSlug: string) {
   console.log('Starting auth with game context:', { gameId, gameSlug });
-  
+
+  document.cookie = `game_claim_id=${encodeURIComponent(gameId)}; path=/;`;
+  document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
+
   return signIn("twitter", { 
     callbackUrl: `/auth/callback?gameId=${encodeURIComponent(gameId)}&gameSlug=${encodeURIComponent(gameSlug)}`,
   });
