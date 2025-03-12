@@ -445,25 +445,22 @@ function extractHandleFromUrl(url: string): string | null {
 
 
 
+
+// src/actions/auth-actions.ts
 export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
   try {
-  //  console.log('Verifying and claiming game with Auth.js', { gameId, gameSlug });
-    
-    // Get the current session from Auth.js
     const session = await auth();
     
     if (!session?.user?.xId || !session?.user?.xHandle) {
-      console.error('User not authenticated or missing X.com data');
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`);
+      return {
+        success: false,
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`
+      };
     }
 
-    // Type assertion to let TypeScript know these values are definitely strings after the null check
     const xId = session.user.xId as string;
     const xHandle = session.user.xHandle as string;
-    
-   // console.log('User authenticated with Auth.js', { xId, xHandle });
 
-    // Get the game from the database
     const supabase = createServerSupabaseClient();
     const { data: game, error: gameError } = await supabase
       .from('games')
@@ -472,78 +469,61 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
       .single();
 
     if (gameError || !game) {
-      console.error('Error fetching game:', gameError);
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`);
+      return {
+        success: false,
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`
+      };
     }
 
-    // Extract the Twitter handle from the developer URL
     const developerUrl = game.developer_url || "";
     const expectedHandle = extractHandleFromUrl(developerUrl);
     
-    // console.log('Comparing handles', {
-    //   developerUrl,
-    //   expectedHandle,
-    //   userHandle: xHandle
-    // });
-    
     if (!expectedHandle) {
-      console.error('Invalid developer URL', { developerUrl });
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`);
+      return {
+        success: false,
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`
+      };
     }
 
-    // Verify that the authenticated user's handle matches the developer URL
-    // Case-insensitive comparison of handles
     if (expectedHandle.toLowerCase() !== xHandle.toLowerCase()) {
-      console.error('Handle mismatch', { 
-        expectedHandle, 
-        userHandle: xHandle 
-      });
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent("not_your_game")}`);
+      return {
+        success: false,
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("not_your_game")}`
+      };
     }
 
-    // At this point, we've verified that the authenticated user is the developer
-    // So even if the game is already claimed, we should allow them to proceed
-    // The claimGame function will handle the case where the game is already claimed
-
-    // Claim the game using the existing function
-  //  console.log('Calling claimGame function with', { gameId, xId, xHandle });
     const claimResult = await claimGame(gameId, xId, xHandle);
-    // console.log('claimGame result:', claimResult);
     
     if (!claimResult.success) {
-      console.error('Failed to claim game', { error: claimResult.error });
-      
-      // If the error is that the game is already claimed by another developer,
-      // redirect with a specific error message
       if (claimResult.error === 'already_claimed_by_another') {
-        return redirect(`/games/${gameSlug}?error=${encodeURIComponent("already_claimed_by_another")}`);
+        return {
+          success: false,
+          redirect: `/games/${gameSlug}?error=${encodeURIComponent("already_claimed_by_another")}`
+        };
       }
-      
-      return redirect(`/games/${gameSlug}?error=${encodeURIComponent(claimResult.error || "update_failed")}`);
+      return {
+        success: false,
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent(claimResult.error || "update_failed")}`
+      };
     }
 
-    // As a backup, also call the direct database function to ensure claimed status is set
-  //  console.log('Calling update_game_claimed_status function with', { gameId });
     const { error: functionError } = await supabase.rpc('update_game_claimed_status', {
       game_id: gameId
     });
-    
+
     if (functionError) {
-      console.error('Error calling update function:', functionError);
-      // Don't return error here, as the previous update might have succeeded
-    } else {
-     // console.log('Successfully called update_game_claimed_status function');
+      console.error('Error in update_game_claimed_status:', functionError);
     }
 
-    // Success - redirect back to the game page with success parameter
-    const redirectUrl = `/games/${gameSlug}?success=game-claimed`;
-    // console.log('Game claimed successfully, redirecting to:', redirectUrl);
-    return redirect(redirectUrl);
+    return {
+      success: true,
+      redirect: `/games/${gameSlug}?success=game-claimed`
+    };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error; // Re-throw NEXT_REDIRECT error to let Next.js handle it
-    }
     console.error('Error in verifyAndClaimGame:', error);
-    return redirect(`/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`);
+    return {
+      success: false,
+      redirect: `/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`
+    };
   }
 }
