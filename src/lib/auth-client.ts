@@ -15,7 +15,7 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
   document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
 
   return signIn("twitter", { 
-    callbackUrl: `/auth/callback?gameId=${encodeURIComponent(gameId)}&gameSlug=${encodeURIComponent(gameSlug)}`,
+   // callbackUrl: `/auth/callback?gameId=${encodeURIComponent(gameId)}&gameSlug=${encodeURIComponent(gameSlug)}`,
   });
 }
 
