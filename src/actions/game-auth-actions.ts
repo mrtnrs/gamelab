@@ -110,28 +110,28 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
  * Check if the current authenticated user is the developer of a game
  * This is a server-side function that can be used in server components
  */
-export async function isGameDeveloper(gameId: string): Promise<boolean> {
-  try {
-    const session = await auth();
+// export async function isGameDeveloper(gameId: string): Promise<boolean> {
+//   try {
+//     const session = await auth();
     
-    if (!session?.user?.xId) {
-      return false;
-    }
+//     if (!session?.user?.xId) {
+//       return false;
+//     }
 
-    const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from('games')
-      .select('developer_twitter_id, claimed')
-      .eq('id', gameId)
-      .single();
+//     const supabase = createServerSupabaseClient();
+//     const { data, error } = await supabase
+//       .from('games')
+//       .select('developer_twitter_id, claimed')
+//       .eq('id', gameId)
+//       .single();
 
-    if (error || !data || !data.claimed) {
-      return false;
-    }
+//     if (error || !data || !data.claimed) {
+//       return false;
+//     }
 
-    return data.developer_twitter_id === session.user.xId;
-  } catch (error) {
-    console.error('Error checking if user is game developer:', error);
-    return false;
-  }
-}
+//     return data.developer_twitter_id === session.user.xId;
+//   } catch (error) {
+//     console.error('Error checking if user is game developer:', error);
+//     return false;
+//   }
+// }
