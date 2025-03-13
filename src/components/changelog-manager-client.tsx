@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createChangelog, updateChangelog, deleteChangelog } from '@/actions/changelog-actions';
-import { FiPlus, FiEdit2, FiTrash2, FiChevronDown, FiChevronUp, FiCalendar, FiTag } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiChevronDown, FiChevronUp, FiCalendar } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import Script from 'next/script';
 
@@ -73,6 +73,7 @@ export default function ChangelogManagerClient({
   }, [twitterScriptLoaded, expandedChangelogs]);
 
   const handleAddChangelog = () => {
+    console.log("[handleAddChangelog] Opening modal to add new changelog.");
     setTitle('');
     setContent('');
     setVersion('');
@@ -82,6 +83,7 @@ export default function ChangelogManagerClient({
   };
 
   const handleEditChangelog = (changelog: ClientChangelog) => {
+    console.log("[handleEditChangelog] Editing changelog:", changelog);
     setTitle(changelog.title);
     setContent(changelog.content);
     setVersion(changelog.version || '');
@@ -91,6 +93,7 @@ export default function ChangelogManagerClient({
   };
 
   const handleCloseModal = () => {
+    console.log("[handleCloseModal] Closing modal.");
     setIsModalOpen(false);
     setTitle('');
     setContent('');
@@ -100,44 +103,41 @@ export default function ChangelogManagerClient({
     setError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    console.log("[handleSubmit] Form submission triggered.");
-    e.preventDefault();
-    console.log("[handleSubmit] Prevented default form submission.");
-
+  // This function replaces the native form submission.
+  const handleSubmitClick = async () => {
+    console.log("[handleSubmitClick] Submit button clicked.");
     if (!title.trim() || !content.trim()) {
-      console.log("[handleSubmit] Validation failed. Title or content empty.");
+      console.log("[handleSubmitClick] Validation failed. Title or content empty.");
       setError('Title and content are required');
       return;
     }
-
-    console.log("[handleSubmit] Validation passed. Title and content provided.");
-    console.log("[handleSubmit] Title:", title, "Content:", content, "Version:", version, "Tweet URL:", tweetUrl);
+    console.log("[handleSubmitClick] Validation passed. Title and content provided.");
+    console.log("[handleSubmitClick] Title:", title, "Content:", content, "Version:", version, "Tweet URL:", tweetUrl);
 
     setIsSubmitting(true);
-    console.log("[handleSubmit] isSubmitting set to true.");
+    console.log("[handleSubmitClick] isSubmitting set to true.");
 
     // Extract tweet ID from URL if provided
     let tweetId = '';
     if (tweetUrl) {
-      console.log("[handleSubmit] Tweet URL provided:", tweetUrl);
+      console.log("[handleSubmitClick] Tweet URL provided:", tweetUrl);
       const tweetUrlMatch = tweetUrl.match(/twitter\.com\/\w+\/status\/(\d+)/);
       tweetId = tweetUrlMatch ? tweetUrlMatch[1] : '';
-      console.log("[handleSubmit] Extracted tweetId:", tweetId);
+      console.log("[handleSubmitClick] Extracted tweetId:", tweetId);
     } else {
-      console.log("[handleSubmit] No tweet URL provided.");
+      console.log("[handleSubmitClick] No tweet URL provided.");
     }
     
     try {
       if (editingChangelogId) {
-        console.log("[handleSubmit] Editing existing changelog with id:", editingChangelogId);
+        console.log("[handleSubmitClick] Editing existing changelog with id:", editingChangelogId);
         // Update existing changelog
         const updatedChangelog = await updateChangelog(editingChangelogId, { 
           game_id: gameId,
           title, 
           content
         });
-        console.log("[handleSubmit] updateChangelog returned:", updatedChangelog);
+        console.log("[handleSubmitClick] updateChangelog returned:", updatedChangelog);
         
         setChangelogs(changelogs.map(cl =>
           cl.id === editingChangelogId
@@ -150,18 +150,18 @@ export default function ChangelogManagerClient({
               }
             : cl
         ));
-        console.log("[handleSubmit] Updated changelogs state after editing.");
+        console.log("[handleSubmitClick] Updated changelogs state after editing.");
         toast.success('Changelog updated successfully');
-        console.log("[handleSubmit] Toast: Changelog updated successfully");
+        console.log("[handleSubmitClick] Toast: Changelog updated successfully");
       } else {
-        console.log("[handleSubmit] Creating new changelog.");
+        console.log("[handleSubmitClick] Creating new changelog.");
         // Create new changelog
         const newChangelog = await createChangelog({
           game_id: gameId,
           title,
           content
         });
-        console.log("[handleSubmit] createChangelog returned:", newChangelog);
+        console.log("[handleSubmitClick] createChangelog returned:", newChangelog);
         
         setChangelogs([
           {
@@ -175,16 +175,16 @@ export default function ChangelogManagerClient({
           },
           ...changelogs
         ]);
-        console.log("[handleSubmit] New changelog added to state.");
+        console.log("[handleSubmitClick] New changelog added to state.");
         toast.success('Changelog created successfully');
-        console.log("[handleSubmit] Toast: Changelog created successfully");
+        console.log("[handleSubmitClick] Toast: Changelog created successfully");
       }
     } catch (err) {
-      console.error('[handleSubmit] Error submitting changelog:', err);
+      console.error('[handleSubmitClick] Error submitting changelog:', err);
       setError('Failed to save changelog');
     } finally {
       setIsSubmitting(false);
-      console.log("[handleSubmit] isSubmitting set to false.");
+      console.log("[handleSubmitClick] isSubmitting set to false.");
     }
   };
 
@@ -216,6 +216,7 @@ export default function ChangelogManagerClient({
   };
 
   const toggleChangelogExpansion = (id: string) => {
+    console.log("[toggleChangelogExpansion] Toggling expansion for changelog id:", id);
     setExpandedChangelogs(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
@@ -229,7 +230,10 @@ export default function ChangelogManagerClient({
       <Script
         src="https://platform.twitter.com/widgets.js"
         strategy="lazyOnload"
-        onLoad={() => setTwitterScriptLoaded(true)}
+        onLoad={() => {
+          console.log("[Script onLoad] Twitter script loaded.");
+          setTwitterScriptLoaded(true);
+        }}
       />
 
       <div className="flex justify-between items-center mb-4">
@@ -339,7 +343,8 @@ export default function ChangelogManagerClient({
               {editingChangelogId ? 'Edit Changelog' : 'Add Changelog'}
             </h2>
 
-            <form onSubmit={handleSubmit}>
+            {/* Replace the form with a plain div to prevent default POST submission */}
+            <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label htmlFor="title" className="block text-sm font-medium mb-1">
@@ -415,7 +420,8 @@ export default function ChangelogManagerClient({
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmitClick}
                   className={`bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md transition-colors ${
                     isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
@@ -424,7 +430,7 @@ export default function ChangelogManagerClient({
                   {isSubmitting ? 'Saving...' : editingChangelogId ? 'Update' : 'Add'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
