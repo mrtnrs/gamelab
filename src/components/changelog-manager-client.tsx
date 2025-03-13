@@ -101,30 +101,43 @@ export default function ChangelogManagerClient({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("[handleSubmit] Form submission triggered.");
     e.preventDefault();
+    console.log("[handleSubmit] Prevented default form submission.");
 
     if (!title.trim() || !content.trim()) {
+      console.log("[handleSubmit] Validation failed. Title or content empty.");
       setError('Title and content are required');
       return;
     }
 
+    console.log("[handleSubmit] Validation passed. Title and content provided.");
+    console.log("[handleSubmit] Title:", title, "Content:", content, "Version:", version, "Tweet URL:", tweetUrl);
+
     setIsSubmitting(true);
-    
+    console.log("[handleSubmit] isSubmitting set to true.");
+
     // Extract tweet ID from URL if provided
     let tweetId = '';
     if (tweetUrl) {
+      console.log("[handleSubmit] Tweet URL provided:", tweetUrl);
       const tweetUrlMatch = tweetUrl.match(/twitter\.com\/\w+\/status\/(\d+)/);
       tweetId = tweetUrlMatch ? tweetUrlMatch[1] : '';
+      console.log("[handleSubmit] Extracted tweetId:", tweetId);
+    } else {
+      console.log("[handleSubmit] No tweet URL provided.");
     }
     
     try {
       if (editingChangelogId) {
+        console.log("[handleSubmit] Editing existing changelog with id:", editingChangelogId);
         // Update existing changelog
         const updatedChangelog = await updateChangelog(editingChangelogId, { 
           game_id: gameId,
           title, 
           content
         });
+        console.log("[handleSubmit] updateChangelog returned:", updatedChangelog);
         
         setChangelogs(changelogs.map(cl =>
           cl.id === editingChangelogId
@@ -137,14 +150,18 @@ export default function ChangelogManagerClient({
               }
             : cl
         ));
+        console.log("[handleSubmit] Updated changelogs state after editing.");
         toast.success('Changelog updated successfully');
+        console.log("[handleSubmit] Toast: Changelog updated successfully");
       } else {
+        console.log("[handleSubmit] Creating new changelog.");
         // Create new changelog
         const newChangelog = await createChangelog({
           game_id: gameId,
           title,
           content
         });
+        console.log("[handleSubmit] createChangelog returned:", newChangelog);
         
         setChangelogs([
           {
@@ -158,32 +175,43 @@ export default function ChangelogManagerClient({
           },
           ...changelogs
         ]);
+        console.log("[handleSubmit] New changelog added to state.");
         toast.success('Changelog created successfully');
+        console.log("[handleSubmit] Toast: Changelog created successfully");
       }
     } catch (err) {
-      console.error('Error submitting changelog:', err);
+      console.error('[handleSubmit] Error submitting changelog:', err);
       setError('Failed to save changelog');
     } finally {
       setIsSubmitting(false);
+      console.log("[handleSubmit] isSubmitting set to false.");
     }
   };
 
   const handleDeleteChangelog = async (id: string) => {
+    console.log("[handleDeleteChangelog] Attempting to delete changelog with id:", id);
     if (!confirm('Are you sure you want to delete this changelog?')) {
+      console.log("[handleDeleteChangelog] User cancelled deletion.");
       return;
     }
     
     setLoading(true);
+    console.log("[handleDeleteChangelog] Loading set to true.");
     try {
+      console.log("[handleDeleteChangelog] Calling deleteChangelog server action for id:", id, "gameId:", gameId);
       // Delete changelog using server action
       await deleteChangelog(id, gameId);
+      console.log("[handleDeleteChangelog] deleteChangelog server action completed.");
       setChangelogs(changelogs.filter(cl => cl.id !== id));
+      console.log("[handleDeleteChangelog] Updated changelogs state after deletion.");
       toast.success('Changelog deleted');
+      console.log("[handleDeleteChangelog] Toast: Changelog deleted successfully.");
     } catch (err) {
-      console.error('Error deleting changelog:', err);
+      console.error('[handleDeleteChangelog] Error deleting changelog:', err);
       toast.error('Failed to delete changelog');
     } finally {
       setLoading(false);
+      console.log("[handleDeleteChangelog] Loading set to false.");
     }
   };
 
