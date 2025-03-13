@@ -1,4 +1,3 @@
-// src/auth.ts
 import NextAuth from "next-auth";
 import Twitter from "next-auth/providers/twitter";
 import { cookies } from "next/headers";
@@ -19,22 +18,16 @@ interface ExtendedSession {
       error?: string;
     };
   };
-  gameId?: string;
-  gameSlug?: string;
   expires: string;
 }
 
-interface TwitterData {
+interface TwitterProfile {
   data: {
     username: string;
     name: string;
     profile_image_url: string;
     id: string;
   };
-}
-
-interface TwitterProfile {
-  data: TwitterData["data"];
 }
 
 interface ExtendedUser {
@@ -53,12 +46,25 @@ interface ExtendedUser {
   };
 }
 
+// Define the shape of the JWT token
+interface ExtendedToken {
+  accessToken?: string;
+  xId?: string;
+  xHandle?: string;
+  gameId?: string;
+  gameSlug?: string;
+  claimResult?: {
+    success: boolean;
+    redirect?: string;
+    error?: string;
+  };
+  [key: string]: any; // Allow additional properties from NextAuth
+}
+
 function extractHandleFromUrl(url: string): string {
   console.log('[extractHandleFromUrl] Processing URL:', { url });
   try {
-    const match =
-      url.match(/twitter\.com\/([^\/?]+)/i) ||
-      url.match(/x\.com\/([^\/?]+)/i);
+    const match = url.match(/twitter\.com\/([^\/?]+)/i) || url.match(/x\.com\/([^\/?]+)/i);
     const handle = match ? match[1] : "";
     console.log('[extractHandleFromUrl] Result:', { handle });
     return handle;
@@ -152,7 +158,6 @@ export const {
             gameSlug: extUser.gameSlug,
           });
 
-          // Perform game developer verification and claim process immediately
           try {
             const { createServerSupabaseClient } = await import("./utils/supabase-admin");
             const supabase = createServerSupabaseClient();
@@ -203,7 +208,6 @@ export const {
                   console.error('[signIn Callback] Backup update failed:', functionError);
                 }
                 console.log('[signIn Callback] Claim successful');
-                // Save claim result on user for downstream use if needed.
                 extUser.claimResult = {
                   success: true,
                   redirect: `/games/${gameSlugCookie}?success=game-claimed`,
@@ -226,38 +230,69 @@ export const {
     },
     async jwt({ token, account, profile, user }) {
       console.log('[jwt Callback] Starting with:', { token, account, profile, user });
+      const extendedToken = token as ExtendedToken;
+
       if (account && account.provider === "twitter" && profile && "data" in profile) {
         const twitterProfile = profile as unknown as TwitterProfile;
-        token.accessToken = account.access_token;
-        token.xId = twitterProfile.data.id;
-        token.xHandle = twitterProfile.data.username;
-        console.log('[jwt Callback] Twitter data added:', { xId: token.xId, xHandle: token.xHandle });
+        extendedToken.accessToken = account.access_token;
+        extendedToken.xId = twitterProfile.data.id;
+        extendedToken.xHandle = twitterProfile.data.username;
+        console.log('[jwt Callback] Twitter data added:', { xId: extendedToken.xId, xHandle: extendedToken.xHandle });
       }
 
       if (user) {
         const extUser = user as ExtendedUser;
         if (extUser.gameId && extUser.gameSlug) {
-          token.gameId = extUser.gameId;
-          token.gameSlug = extUser.gameSlug;
-          console.log('[jwt Callback] Game context added:', { gameId: token.gameId, gameSlug: token.gameSlug });
+          extendedToken.gameId = extUser.gameId;
+          extendedToken.gameSlug = extUser.gameSlug;
+          console.log('[jwt Callback] Game context added:', { gameId: extendedToken.gameId, gameSlug: extendedToken.gameSlug });
+        }
+        if (extUser.claimResult) {
+          extendedToken.claimResult = extUser.claimResult;
+          console.log('[jwt Callback] Claim result added:', { claimResult: extendedToken.claimResult });
         }
       }
 
-      console.log('[jwt Callback] Complete:', token);
-      return token;
+      console.log('[jwt Callback] Complete:', extendedToken);
+      return extendedToken;
     },
     async session({ session, token }) {
       console.log('[session Callback] Starting with:', { session, token });
       const extendedSession = session as ExtendedSession;
+      const extendedToken = token as ExtendedToken;
 
-      if (token && extendedSession.user) {
-        extendedSession.user.xId = token.xId as string;
-        extendedSession.user.xHandle = token.xHandle as string;
+      if (extendedToken && extendedSession.user) {
+        extendedSession.user.xId = extendedToken.xId as string;
+        extendedSession.user.xHandle = extendedToken.xHandle as string;
+        if (extendedToken.gameId && extendedToken.gameSlug) {
+          extendedSession.user.gameId = extendedToken.gameId;
+          extendedSession.user.gameSlug = extendedToken.gameSlug;
+        }
+        if (extendedToken.claimResult) {
+          extendedSession.user.claimResult = extendedToken.claimResult;
+          console.log('[session Callback] Claim result added to session:', { claimResult: extendedSession.user.claimResult });
+        }
         console.log('[session Callback] User updated:', extendedSession.user);
       }
 
       console.log('[session Callback] Complete:', extendedSession);
       return extendedSession;
+    },
+    async redirect({ url, baseUrl }) {
+      console.log('[redirect Callback] Starting with:', { url, baseUrl });
+
+      const session = await auth();
+      const extendedSession = session as ExtendedSession;
+      console.log('[redirect Callback] Session:', { extendedSession });
+
+      if (extendedSession?.user?.claimResult?.redirect) {
+        const redirectUrl = `${baseUrl}${extendedSession.user.claimResult.redirect}`;
+        console.log('[redirect Callback] Redirecting to claim result:', { redirectUrl });
+        return redirectUrl;
+      }
+
+      console.log('[redirect Callback] No claim result, redirecting to:', { url });
+      return url;
     },
   },
 });
