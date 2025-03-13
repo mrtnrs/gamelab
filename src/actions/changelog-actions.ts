@@ -1,5 +1,3 @@
-"use server"
-
 import { auth } from "@/auth";
 import { createServerSupabaseClient } from "@/utils/supabase-admin";
 import { gameService, Changelog } from "@/services/game-service";
