@@ -1135,6 +1135,8 @@ export const gameService = {
         console.error('Error fetching game for changelog:', gameError);
         return { success: false, error: 'Game not found' };
       }
+
+      console.log("[gameService.addChangelog] Fetched game:", game);
       
       // Check if the game is claimed
       if (!game.claimed) {
@@ -1201,7 +1203,7 @@ export const gameService = {
         console.error('Error fetching game for changelog update:', gameError);
         return { success: false, error: 'Game not found' };
       }
-      
+      console.log("[gameService.updateChangelog] Fetched game:", game);
       // Check if the game is claimed
       if (!game.claimed) {
         return { 
@@ -1271,6 +1273,8 @@ export const gameService = {
         console.error('Error fetching game for changelog deletion:', gameError);
         return { success: false, error: 'Game not found' };
       }
+
+      console.log("[gameService.deleteChangelog] Fetched game:", game);
       
       // Check if the game is claimed
       if (!game.claimed) {

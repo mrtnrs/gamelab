@@ -26,7 +26,10 @@ export async function createChangelog(data: {
   title: string;
   content: string;
 }): Promise<any> {
-  // Retrieve the current session
+  // Retrieve the current Session
+
+  console.log("[createChangelog] Invoked with data:", data);
+
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
@@ -84,6 +87,8 @@ export async function updateChangelog(
   data: { game_id: string; title: string; content: string }
 ): Promise<any> {
   // Retrieve the current session
+  console.log("[updateChangelog] Invoked with data:", data);
+
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
@@ -140,6 +145,8 @@ export async function deleteChangelog(
   gameId: string
 ): Promise<void> {
   // Retrieve the current session
+  console.log("[cdeleteChangelog] Invoked with data:", id, gameId);
+
   const session = await auth();
   if (!session?.user) {
     throw new Error("Unauthorized");
