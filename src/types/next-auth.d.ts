@@ -8,7 +8,6 @@ declare module "next-auth" {
   interface User {
     xId?: string;
     xHandle?: string;
-    isDeveloperForGameId?: string;
   }
 
   /**
@@ -29,6 +28,5 @@ declare module "next-auth" {
     xHandle?: string;
     gameId?: string;
     gameSlug?: string;
-    isDeveloperForGameId?: string;
   }
 }

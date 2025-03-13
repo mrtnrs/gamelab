@@ -443,6 +443,10 @@ function extractHandleFromUrl(url: string): string | null {
   }
 }
 
+
+
+
+// src/actions/auth-actions.ts
 export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
   try {
     const session = await auth();
@@ -510,16 +514,6 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
     if (functionError) {
       console.error('Error in update_game_claimed_status:', functionError);
     }
-
-    // Store the developer status in a cookie for the session
-    const cookieStore = await cookies();
-    cookieStore.set('developer_for_game_id', gameId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
-      sameSite: 'lax'
-    });
 
     return {
       success: true,

@@ -206,6 +206,17 @@ export default function GameDetailClient({
     }
   }, [formattedGame.claimed, processedUrlParams]); // Remove hasHandledSuccess from dependencies 
   
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    if (success === 'game-claimed' && !processedUrlParams['success-game-claimed']) {
+      setIsGameDeveloper(true);
+      setProcessedUrlParams(prev => ({ ...prev, 'success-game-claimed': true }));
+      urlParams.delete('success');
+      window.history.replaceState({}, '', `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}`);
+    }
+  }, [processedUrlParams]);
+
   const handleGameClaimed = () => {
     // console.log('🎮 handleGameClaimed called');
     // console.log('🎮 Current claimed status:', formattedGame.claimed);

@@ -18,7 +18,6 @@ interface ExtendedSession {
       redirect?: string;
       error?: string;
     };
-    isDeveloperForGameId?: string;
   };
   gameId?: string;
   gameSlug?: string;
@@ -52,7 +51,6 @@ interface ExtendedUser {
     redirect?: string;
     error?: string;
   };
-  isDeveloperForGameId?: string;
 }
 
 function extractHandleFromUrl(url: string): string {
@@ -241,11 +239,6 @@ export const {
         if (extUser.gameId && extUser.gameSlug) {
           token.gameId = extUser.gameId;
           token.gameSlug = extUser.gameSlug;
-          // If the user has successfully claimed a game, mark them as the developer
-          if (extUser.claimResult && extUser.claimResult.success) {
-            token.isDeveloperForGameId = extUser.gameId;
-            console.log('[jwt Callback] User marked as developer for game:', token.isDeveloperForGameId);
-          }
           console.log('[jwt Callback] Game context added:', { gameId: token.gameId, gameSlug: token.gameSlug });
         }
       }
@@ -260,13 +253,6 @@ export const {
       if (token && extendedSession.user) {
         extendedSession.user.xId = token.xId as string;
         extendedSession.user.xHandle = token.xHandle as string;
-        
-        // Pass the game developer status to the session
-        if (token.isDeveloperForGameId) {
-          extendedSession.user.isDeveloperForGameId = token.isDeveloperForGameId as string;
-          console.log('[session Callback] Developer status added for game:', extendedSession.user.isDeveloperForGameId);
-        }
-        
         console.log('[session Callback] User updated:', extendedSession.user);
       }
 

@@ -85,59 +85,22 @@ export async function generateMetadata(
 export const dynamicParams = false;
 
 export default async function GamePage({ params }: Props) {
-  const resolvedParams = await params;
-  const { slug } = resolvedParams;
-
-  // Fetch the game data server-side
+  const { slug } = await params;
   const game = await gameService.getGameBySlug(slug);
+  if (!game) return <div>Game not found</div>;
 
-  if (!game) {
-    return <div>Game not found</div>;
-  }
-
-  // Fetch changelogs and handle errors
-  let changelogs: Changelog[] = [];
-  try {
-    changelogs = await gameService.getChangelogs(game.id);
-    changelogs = changelogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  } catch (err) {
-    console.error('Error fetching changelogs:', err);
-  }
-
-  // Check if user is the developer - IMPROVED ALGORITHM
   let isGameDeveloper = false;
-  
-  // Get the session and user handle
-  const session = await auth(); // Use your auth helper
+  const session = await auth();
   const xHandle = session?.user?.xHandle;
-  
-  // First check if the user has been verified as the developer during authentication
-  if (session?.user?.isDeveloperForGameId === game.id) {
-    isGameDeveloper = true;
-    console.log('User is verified as developer from session data');
-  } else {
-    // Check for the developer cookie
-    const cookieStore = await cookies();
-    const developerForGameId = cookieStore.get('developer_for_game_id')?.value;
-    
-    if (developerForGameId === game.id) {
-      isGameDeveloper = true;
-      console.log('User is verified as developer from cookie');
-    } else {
-      // Fallback to checking if handles match (case insensitive)
-      const gameDeveloperHandle = extractHandleFromUrl(game.developer_url || '');
-      
-      if (xHandle && gameDeveloperHandle && 
-          gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
-        isGameDeveloper = true;
-        console.log('User is verified as developer from handle match');
-      }
-    }
-  }
-  
+  const gameDeveloperHandle = extractHandleFromUrl(game.developer_url || '');
 
-  // Adapt changelogs for the client component
-  const clientChangelogs: Changelog[] = changelogs.map(changelog => ({
+  if (xHandle && gameDeveloperHandle && 
+      gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
+    isGameDeveloper = true;
+  }
+
+  const changelogs = await gameService.getChangelogs(game.id);
+  const clientChangelogs = changelogs.map(changelog => ({
     id: changelog.id,
     title: changelog.title,
     content: changelog.content,
@@ -156,6 +119,65 @@ export default async function GamePage({ params }: Props) {
     />
   );
 }
+
+// export default async function GamePage({ params }: Props) {
+//   const resolvedParams = await params;
+//   const { slug } = resolvedParams;
+
+//   // Fetch the game data server-side
+//   const game = await gameService.getGameBySlug(slug);
+
+//   if (!game) {
+//     return <div>Game not found</div>;
+//   }
+
+//   // Fetch changelogs and handle errors
+//   let changelogs: Changelog[] = [];
+//   try {
+//     changelogs = await gameService.getChangelogs(game.id);
+//     changelogs = changelogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+//   } catch (err) {
+//     console.error('Error fetching changelogs:', err);
+//   }
+
+//   // Check if user is the developer - IMPROVED ALGORITHM
+//   let isGameDeveloper = false;
+  
+//   // Get the session and user handle
+//   const session = await auth(); // Use your auth helper
+//   const xHandle = session?.user?.xHandle;
+  
+//   // Get developer handle from the game's developer URL
+//   const gameDeveloperHandle = extractHandleFromUrl(game.developer_url || '');
+  
+  
+//   // Check if handles match (case insensitive)
+//   if (xHandle && gameDeveloperHandle && 
+//       gameDeveloperHandle.toLowerCase() === xHandle.toLowerCase()) {
+//     isGameDeveloper = true;
+//   }
+  
+
+//   // Adapt changelogs for the client component
+//   const clientChangelogs: Changelog[] = changelogs.map(changelog => ({
+//     id: changelog.id,
+//     title: changelog.title,
+//     content: changelog.content,
+//     version: changelog.version,
+//     date: changelog.date
+//   }));
+
+//   return (
+//     <GameDetailClient
+//       game={game}
+//       slug={slug}
+//       initialChangelogs={clientChangelogs}
+//       isGameDeveloper={isGameDeveloper}
+//       userRating={null}
+//       comments={[]}
+//     />
+//   );
+// }
 
 // Generate static paths (unchanged)
 export async function generateStaticParams(): Promise<{ slug: string }[]> {
