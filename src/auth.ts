@@ -131,9 +131,10 @@ export const {
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('[signIn Callback] Starting with:', { user, account, profile });
+      const extUser = user as ExtendedUser;
       if (account?.provider === "twitter" && profile && "data" in profile) {
         const twitterProfile = profile as unknown as TwitterProfile;
-        const extUser = user as ExtendedUser;
+        
 
         console.log('[signIn Callback] Processing Twitter profile:', twitterProfile);
         extUser.xId = twitterProfile.data.id;
@@ -222,7 +223,10 @@ export const {
         }
       }
       console.log('[signIn Callback] Complete:', { user });
-      return true;
+      
+      return extUser.claimResult?.redirect ?? true;
+
+      //return true;
     },
     async jwt({ token, account, profile, user }) {
       console.log('[jwt Callback] Starting with:', { token, account, profile, user });
