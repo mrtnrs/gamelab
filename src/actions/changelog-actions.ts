@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { createServerSupabaseClient } from "@/utils/supabase-admin";
 import { gameService, Changelog } from "@/services/game-service";
 
+export const runtime = 'edge'
+
 // Helper function to extract the handle from a URL.
 function extractHandleFromUrl(url: string): string | null {
   if (!url) return null;
