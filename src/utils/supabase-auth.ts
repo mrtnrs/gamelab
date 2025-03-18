@@ -1,6 +1,6 @@
 // src/utils/supabase-auth.ts
+import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from './supabase-client';
-import { createServerSupabaseClient } from './supabase-admin';
 
 /**
  * Extract Twitter/X handle from a URL
@@ -60,7 +60,7 @@ export async function isGameDeveloper(gameId: string): Promise<boolean> {
     if (error || !game) return false;
     
     // Extract handle from developer URL
-    const developerHandle = extractHandleFromUrl(game.developer_url);
+    const developerHandle = extractHandleFromUrl(game.developer_url as string);
     if (!developerHandle) return false;
     
     // Compare handles (case insensitive)
@@ -72,40 +72,22 @@ export async function isGameDeveloper(gameId: string): Promise<boolean> {
 }
 
 /**
- * Claim a game for the current authenticated user
+ * Claim a game for the authenticated user - now accepts a client for Edge compatibility
  */
-export async function claimGame(gameId: string): Promise<{ success: boolean; error?: string }> {
+export async function claimGame(
+  supabase: SupabaseClient,
+  gameId: string, 
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get the current user
-    const user = await getCurrentUser();
-    if (!user) {
-      return { success: false, error: 'not_authenticated' };
+    if (!gameId || !userId) {
+      return { success: false, error: 'missing_required_parameters' };
     }
     
-    // Get user provider data to extract Twitter/X handle
-    const providerData = user.app_metadata?.provider_data;
-    if (!providerData) {
-      return { success: false, error: 'missing_provider_data' };
-    }
-    
-    // For Twitter auth, we need to extract the handle from user metadata
-    let userHandle: string | null = null;
-    
-    // Extract Twitter handle from user metadata
-    if (user.app_metadata?.provider === 'twitter') {
-      userHandle = user.user_metadata?.user_name || 
-                   user.user_metadata?.preferred_username;
-    }
-    
-    if (!userHandle) {
-      return { success: false, error: 'missing_user_handle' };
-    }
-    
-    // Get the game's developer URL
-    const supabase = await getSupabaseBrowserClient();
+    // Check if the game exists and is not already claimed
     const { data: game, error } = await supabase
       .from('games')
-      .select('developer_url, claimed')
+      .select('claimed')
       .eq('id', gameId)
       .single();
     
@@ -113,22 +95,18 @@ export async function claimGame(gameId: string): Promise<{ success: boolean; err
       return { success: false, error: 'game_not_found' };
     }
     
-    // Extract handle from developer URL
-    const developerHandle = extractHandleFromUrl(game.developer_url);
-    if (!developerHandle) {
-      return { success: false, error: 'invalid_developer_url' };
+    if (game.claimed) {
+      return { success: false, error: 'already_claimed' };
     }
     
-    // Compare handles (case insensitive)
-    if (developerHandle.toLowerCase() !== userHandle.toLowerCase()) {
-      return { success: false, error: 'not_your_game' };
-    }
-    
-    // Use the admin client to update the game
-    const adminClient = await createServerSupabaseClient();
-    const { error: updateError } = await adminClient
+    // Update the game as claimed by this user
+    const { error: updateError } = await supabase
       .from('games')
-      .update({ claimed: true })
+      .update({ 
+        claimed: true,
+        claimed_by: userId,
+        claimed_at: new Date().toISOString()
+      })
       .eq('id', gameId);
     
     if (updateError) {
@@ -136,18 +114,16 @@ export async function claimGame(gameId: string): Promise<{ success: boolean; err
       return { success: false, error: 'update_failed' };
     }
     
-    // Also run the RPC function as a backup
+    // Also run the RPC function as a backup if available
     try {
-      await adminClient.rpc('update_game_claimed_status', {
-        game_id: gameId,
+      await supabase.rpc('update_game_claimed_status', {
+        game_id: gameId as string,
+        user_id: userId
       });
     } catch (rpcError) {
       console.error('Error running RPC function:', rpcError);
       // We don't fail the entire operation if just the RPC fails
     }
-    
-    // Note: Cookie setting must be done in a Server Action, not here
-    // This function should be called from a Server Action that handles cookie setting
     
     return { success: true };
   } catch (error) {

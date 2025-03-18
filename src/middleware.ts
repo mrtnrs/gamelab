@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { CookieOptions } from '@supabase/ssr';
 
+// This middleware runs in the Edge runtime
+export const runtime = 'experimental-edge';
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   
@@ -17,10 +20,12 @@ export async function middleware(req: NextRequest) {
             return req.cookies.get(name)?.value;
           },
           set(name: string, value: string, options: CookieOptions) {
+            // Set HttpOnly cookies by default for security
             res.cookies.set({
               name,
               value,
               ...options,
+              httpOnly: options.httpOnly !== false,
             });
           },
           remove(name: string, options: CookieOptions) {
@@ -36,6 +41,7 @@ export async function middleware(req: NextRequest) {
     );
     
     // Refresh session if expired - required for Server Components
+    // This will set the auth cookie if it needs to be refreshed
     await supabase.auth.getSession();
   } catch (error) {
     console.error('Middleware error:', error);
@@ -53,6 +59,7 @@ export const config = {
     // - Static files (e.g. /favicon.ico)
     // - Public files
     // - _next files
-    '/((?!_next/|api/|favicon.ico|public/).*)',
+    // - Assets like images, fonts, etc.
+    '/((?!_next/|api/|favicon.ico|public/|images/|assets/).*)',
   ],
 };

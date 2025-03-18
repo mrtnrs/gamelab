@@ -1,48 +1,26 @@
 // src/actions/supabase-auth-actions.ts
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/utils/supabase-client';
-import { createServerSupabaseClient } from '@/utils/supabase-admin';
-import { extractHandleFromUrl } from '@/utils/supabase-auth';
+import { createClient, createServiceClient } from '@/utils/supabase-server';
+import { extractHandleFromUrl, claimGame } from '@/utils/supabase-auth';
 
 /**
  * Start the Twitter/X authentication flow
  */
 export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
-  const supabase = await getSupabaseBrowserClient();
+  const supabase = await createClient();
   
-  // Set up the auth redirect URL
-  const redirectUrl = new URL('/auth/supabase-callback', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+  // Use the absolute URL for the callback
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const redirectUrl = new URL('/auth/callback', baseUrl);
   
   // If we have game context, add it to the URL
   if (gameId && gameSlug) {
     redirectUrl.searchParams.set('gameId', gameId);
     redirectUrl.searchParams.set('gameSlug', gameSlug);
-    
-    // Also store in cookies as a backup
-    try {
-      const cookieStore = await cookies();
-      cookieStore.set({
-        name: 'game_claim_id',
-        value: gameId,
-        path: '/',
-        maxAge: 60 * 30, // 30 minutes
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-      });
-      cookieStore.set({
-        name: 'game_claim_slug',
-        value: gameSlug,
-        path: '/',
-        maxAge: 60 * 30, // 30 minutes
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-      });
-    } catch (error) {
-      console.error('Error setting cookies:', error);
-    }
   }
   
   // Start the auth flow with Supabase
@@ -59,8 +37,8 @@ export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
     throw error;
   }
   
-  // Redirect to the Supabase auth URL
-  redirect(data.url);
+  // Return the URL instead of redirecting directly
+  return { url: data.url };
 }
 
 /**
@@ -68,12 +46,31 @@ export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
  */
 export async function handleAuthCallback(code: string) {
   try {
-    const cookieStore = await cookies();
-    const gameId = cookieStore.get('game_claim_id')?.value;
-    const gameSlug = cookieStore.get('game_claim_slug')?.value;
+    // Get query parameters from the URL if possible
+    let gameId: string | null = null;
+    let gameSlug: string | null = null;
+    
+    try {
+      const headersList = await headers();
+      const referer = headersList.get('referer');
+      if (referer) {
+        const url = new URL(referer);
+        gameId = url.searchParams.get('gameId');
+        gameSlug = url.searchParams.get('gameSlug');
+      }
+    } catch (error) {
+      console.warn('Could not get headers, continuing without them:', error);
+    }
+    
+    // Fallback to cookies if URL params aren't available
+    if (!gameId || !gameSlug) {
+      const cookieStore = await cookies();
+      gameId = gameId || cookieStore.get('game_claim_id')?.value || null;
+      gameSlug = gameSlug || cookieStore.get('game_claim_slug')?.value || null;
+    }
     
     // Exchange the code for a session
-    const supabase = await getSupabaseBrowserClient();
+    const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (error) {
@@ -117,7 +114,7 @@ export async function handleAuthCallback(code: string) {
       }
       
       // Extract handle from developer URL
-      const developerHandle = extractHandleFromUrl(game.developer_url);
+      const developerHandle = extractHandleFromUrl(game.developer_url as string);
       if (!developerHandle) {
         return {
           success: false,
@@ -147,67 +144,26 @@ export async function handleAuthCallback(code: string) {
         };
       }
       
-      // Use the admin client to update the game
-      const adminClient = await createServerSupabaseClient();
-      const { error: updateError } = await adminClient
-        .from('games')
-        .update({ claimed: true })
-        .eq('id', gameId);
+      // Use the service client for admin operations
+      const serviceClient = await createServiceClient();
+      const claimResult = await claimGame(serviceClient, gameId as string, user.id);
       
-      if (updateError) {
-        console.error('Error updating game claimed status:', updateError);
+      if (!claimResult.success) {
         return {
           success: false,
-          error: 'update_failed',
-          redirect: `/games/${gameSlug}?error=${encodeURIComponent('update_failed')}`
+          error: claimResult.error || 'claim_failed',
+          redirect: `/games/${gameSlug}?error=${encodeURIComponent(claimResult.error || 'claim_failed')}`
         };
       }
       
-      // Also run the RPC function as a backup
-      try {
-        await adminClient.rpc('update_game_claimed_status', {
-          game_id: gameId,
-        });
-      } catch (rpcError) {
-        console.error('Error running RPC function:', rpcError);
-        // We don't fail the entire operation if just the RPC fails
-      }
-      
-      // Clear the cookies
-      try {
-        cookieStore.set({
-          name: 'game_claim_id',
-          value: '',
-          path: '/',
-          maxAge: 0,
-        });
-        cookieStore.set({
-          name: 'game_claim_slug',
-          value: '',
-          path: '/',
-          maxAge: 0,
-        });
-        
-        // Set a cookie to indicate the game is claimed
-        cookieStore.set({
-          name: 'claimed_game_id',
-          value: gameId,
-          path: '/',
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-        });
-      } catch (error) {
-        console.error('Error managing cookies:', error);
-      }
-      
+      // Successfully claimed the game
       return {
         success: true,
         redirect: `/games/${gameSlug}?success=game-claimed`
       };
     }
     
-    // If no game context, just redirect to home
+    // No game context, just redirect to home
     return {
       success: true,
       redirect: '/'
@@ -226,23 +182,21 @@ export async function handleAuthCallback(code: string) {
  * Sign out the current user
  */
 export async function signOut() {
-  const supabase = await getSupabaseBrowserClient();
-  await supabase.auth.signOut();
-  
-  // Clear any auth cookies
   try {
-    const cookieStore = await cookies();
-    cookieStore.set({
-      name: 'claimed_game_id',
-      value: '',
-      path: '/',
-      maxAge: 0,
-    });
+    const supabase = await getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    
+    return {
+      success: true,
+      redirect: '/'
+    };
   } catch (error) {
-    console.error('Error clearing cookies:', error);
+    console.error('Error signing out:', error);
+    return {
+      success: false,
+      error: 'sign_out_failed'
+    };
   }
-  
-  return { success: true };
 }
 
 /**
@@ -251,35 +205,26 @@ export async function signOut() {
  */
 export async function checkIsGameDeveloper(gameId: string): Promise<boolean> {
   try {
+    if (!gameId) return false;
+    
+    const supabase = await createClient();
+    
     // Get the current session
-    const supabase = await getSupabaseBrowserClient();
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return false;
     
-    if (!session?.user) return false;
-    
-    // Get the game from the database
-    const { data: game, error } = await supabase
+    // Check if the game exists and is claimed by the current user
+    const { data, error } = await supabase
       .from('games')
-      .select('developer_url')
-      .eq('id', gameId)
+      .select('claimed, claimed_by')
+      .eq('id', gameId as string)
       .single();
     
-    if (error || !game) return false;
+    if (error || !data) return false;
     
-    // Extract handle from developer URL
-    const developerHandle = extractHandleFromUrl(game.developer_url);
-    if (!developerHandle) return false;
-    
-    // Extract user handle from user metadata
-    const userHandle = session.user.user_metadata?.user_name || 
-                       session.user.user_metadata?.preferred_username;
-    
-    if (!userHandle) return false;
-    
-    // Compare handles (case insensitive)
-    return developerHandle.toLowerCase() === userHandle.toLowerCase();
+    return !!data.claimed && data.claimed_by === session.user.id;
   } catch (error) {
-    console.error('Error checking if user is game developer:', error);
+    console.error('Error checking game developer status:', error);
     return false;
   }
 }

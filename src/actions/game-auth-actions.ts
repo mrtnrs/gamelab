@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/utils/supabase-server";
+import { createClient, createServiceClient } from "@/utils/supabase-server";
 import { claimGame } from "@/utils/supabase-auth";
 import { cookies } from "next/headers";
 
@@ -18,7 +18,7 @@ type GameAuthResponse = {
 export async function verifyAndClaimGame(gameId: string, gameSlug: string): Promise<GameAuthResponse> {
   try {
     // Get the Supabase client
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     
     // Get the current session from Supabase
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -51,21 +51,29 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
       .select('developer_url, claimed')
       .eq('id', gameId)
       .single();
-
+    
     if (error || !game) {
-      console.error('Error fetching game:', error);
+      console.error('Error getting game:', error);
       return { 
         success: false, 
         error: "game_not_found",
         redirect: `/games/${gameSlug}?error=${encodeURIComponent("game_not_found")}`
       };
     }
-
-    // Extract the Twitter handle from the developer URL
-    const developerUrl = game.developer_url || "";
-    const match = developerUrl.match(/(?:x\.com|twitter\.com)\/([^\/\?]+)/i);
-    const developerHandle = match ? match[1] : null;
-
+    
+    // Check if the game is already claimed
+    if (game.claimed) {
+      return { 
+        success: false, 
+        error: "already_claimed",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("already_claimed")}`
+      };
+    }
+    
+    // Extract the Twitter/X handle from the developer URL
+    const developerUrl = game.developer_url || '';
+    const developerHandle = getDeveloperHandle(developerUrl);
+    
     if (!developerHandle) {
       return { 
         success: false, 
@@ -73,18 +81,19 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
         redirect: `/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`
       };
     }
-
-    // Compare the handles (case insensitive)
-    if (developerHandle.toLowerCase() !== xHandle.toLowerCase()) {
+    
+    // Check if the handles match (case insensitive)
+    if (xHandle.toLowerCase() !== developerHandle.toLowerCase()) {
       return { 
         success: false, 
-        error: "not_your_game",
-        redirect: `/games/${gameSlug}?error=${encodeURIComponent("not_your_game")}`
+        error: "handle-mismatch",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("handle-mismatch")}`
       };
     }
-
-    // Claim the game using the utility function
-    const claimResult = await claimGame(gameId);
+    
+    // All checks pass - claim the game using the service role client for admin operations
+    const serviceClient = await createServiceClient();
+    const claimResult = await claimGame(serviceClient, gameId, user.id);
     
     if (!claimResult.success) {
       return { 
@@ -109,18 +118,40 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
       // Continue even if cookie setting fails
     }
 
-    // Return success with a redirect URL as a plain object
-    return {
+    // Successfully claimed
+    return { 
       success: true,
       redirect: `/games/${gameSlug}?success=game-claimed`
     };
   } catch (error) {
-    console.error('Error verifying and claiming game:', error);
+    console.error('Error claiming game:', error);
     return { 
       success: false, 
-      error: "update_failed",
-      redirect: `/games/${gameSlug}?error=${encodeURIComponent("update_failed")}`
+      error: "unexpected_error",
+      redirect: `/games/${gameSlug}?error=${encodeURIComponent("unexpected_error")}`
     };
+  }
+}
+
+/**
+ * Helper function to extract the Twitter/X handle from a developer URL
+ */
+function getDeveloperHandle(url: string): string | null {
+  if (!url) return null;
+  
+  try {
+    // Match Twitter/X URLs in various formats
+    const twitterRegex = /(?:https?:\/\/)?(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i;
+    const match = url.match(twitterRegex);
+    
+    if (match && match[1]) {
+      return match[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing developer URL:', error);
+    return null;
   }
 }
 
@@ -130,49 +161,29 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
  */
 export async function isGameDeveloper(gameId: string): Promise<boolean> {
   try {
-    // Get the Supabase client
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createClient();
     
-    // Get the current session from Supabase
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // Get the current session
+    const { data: { session } } = await supabase.auth.getSession();
     
-    if (sessionError || !session) {
+    if (!session) {
       return false;
     }
-
-    // Get the user's Twitter/X information from the session
-    const user = session.user;
-    const userMetadata = user.user_metadata || {};
-    const xHandle = userMetadata.preferred_username || userMetadata.user_name;
     
-    if (!xHandle) {
-      return false;
-    }
-
-    // Get the game from the database
-    const { data: game, error } = await supabase
+    // Check if the game is claimed by the current user
+    const { data, error } = await supabase
       .from('games')
-      .select('developer_url, claimed')
+      .select('claimed, claimed_by')
       .eq('id', gameId)
       .single();
-
-    if (error || !game) {
+    
+    if (error || !data) {
       return false;
     }
-
-    // Extract the Twitter handle from the developer URL
-    const developerUrl = game.developer_url || "";
-    const match = developerUrl.match(/(?:x\.com|twitter\.com)\/([^\/\?]+)/i);
-    const developerHandle = match ? match[1] : null;
-
-    if (!developerHandle) {
-      return false;
-    }
-
-    // Compare the handles (case insensitive)
-    return developerHandle.toLowerCase() === xHandle.toLowerCase();
+    
+    return data.claimed && data.claimed_by === session.user.id;
   } catch (error) {
-    console.error('Error checking if user is game developer:', error);
+    console.error('Error checking game developer:', error);
     return false;
   }
 }

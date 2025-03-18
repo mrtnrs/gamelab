@@ -17,7 +17,14 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
   document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
   
   // Call the server action to start the auth flow
-  return startTwitterAuth(gameId, gameSlug);
+  const response = await startTwitterAuth(gameId, gameSlug);
+  
+  // If we received a URL, redirect to it
+  if (response && response.url) {
+    window.location.href = response.url;
+  } else {
+    throw new Error('No URL returned from startTwitterAuth');
+  }
 }
 
 /**
@@ -25,15 +32,20 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
  * @returns Promise that resolves when the sign-out process is complete
  */
 export async function signOutUser() {
-  // Call the server action to sign out
-  await signOut();
-  
-  // Also sign out on the client side
-  const supabase = await getSupabaseBrowserClient();
-  await supabase.auth.signOut();
-  
-  // Refresh the page to update UI
-  window.location.href = '/';
+  try {
+    // Call the server action to sign out
+    await signOut();
+    
+    // Also sign out on the client side for complete session cleanup
+    const supabase = await getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    
+    // Refresh the page to update UI
+    window.location.href = '/';
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
 }
 
 /**
@@ -41,9 +53,14 @@ export async function signOutUser() {
  * @returns Promise that resolves to the current user or null
  */
 export async function getCurrentUser() {
-  const supabase = await getSupabaseBrowserClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  try {
+    const supabase = await getSupabaseBrowserClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
 }
 
 /**
