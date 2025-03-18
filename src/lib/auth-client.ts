@@ -18,11 +18,11 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
   // Get the Supabase browser client
   const supabase = await getSupabaseBrowserClient();
   
-  // Start the Twitter OAuth flow
+  // Start the Twitter OAuth flow with the correct callback URL
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'twitter',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `${window.location.origin}/auth/supabase-callback`,
       scopes: 'tweet.read users.read',
     },
   });
