@@ -16,14 +16,13 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
   document.cookie = `game_claim_id=${encodeURIComponent(gameId)}; path=/;`;
   document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
   
-  // Call the server action to start the auth flow
-  const response = await startTwitterAuth(gameId, gameSlug);
-  
-  // If we received a URL, redirect to it
-  if (response && response.url) {
-    window.location.href = response.url;
-  } else {
-    throw new Error('No URL returned from startTwitterAuth');
+  try {
+    // Call the server action to start the auth flow
+    // The function now handles redirects internally and doesn't return a URL
+    await startTwitterAuth(gameId, gameSlug);
+  } catch (error) {
+    console.error('Error starting Twitter auth:', error);
+    throw error;
   }
 }
 

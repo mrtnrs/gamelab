@@ -25,6 +25,7 @@ export default function AuthErrorClient({ error }: AuthErrorClientProps) {
     Configuration: 'There is a problem with the server configuration. Please contact support.',
     no_session: 'No authentication session was created. Please try again.',
     session_error: 'There was an error checking your authentication session. Please try again.',
+    server_error: 'The server encountered an error while processing your request. Please try again.',
     
     // Supabase-specific error messages
     invalid_credentials: 'The provided credentials are invalid. Please try again.',
@@ -35,9 +36,12 @@ export default function AuthErrorClient({ error }: AuthErrorClientProps) {
     user_not_found: 'User not found. Please sign up first.',
     auth_failed: 'Authentication failed. Please try again.',
     no_code: 'No authentication code was provided. Please try again.',
+    
+    // Game claim specific errors
     already_claimed: 'This game has already been claimed.',
     invalid_developer_url: 'The developer URL is not a valid Twitter/X profile URL.',
     handle_mismatch: 'Your Twitter/X handle does not match the developer URL provided.',
+    missing_user_handle: 'Could not retrieve your Twitter/X handle. Please ensure you grant the necessary permissions.',
     claim_failed: 'Failed to claim this game. Please try again later.',
     
     // Default error messages

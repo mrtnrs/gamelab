@@ -35,13 +35,22 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
     // Get the user's Twitter/X information from the session
     const user = session.user;
     const userMetadata = user.user_metadata || {};
-    const xHandle = userMetadata.preferred_username || userMetadata.user_name;
+    
+    // Try to get the Twitter handle from various possible metadata locations
+    const xHandle = userMetadata.preferred_username || 
+                    userMetadata.user_name || 
+                    userMetadata.username ||
+                    userMetadata.twitter_handle ||
+                    userMetadata.name;
+    
+    console.log('User metadata from Twitter:', userMetadata);
     
     if (!xHandle) {
+      console.error('Could not find Twitter handle in user metadata:', userMetadata);
       return { 
         success: false, 
-        error: "auth_failed",
-        redirect: `/games/${gameSlug}?error=${encodeURIComponent("auth_failed")}`
+        error: "missing_user_handle",
+        redirect: `/games/${gameSlug}?error=${encodeURIComponent("missing_user_handle")}`
       };
     }
 
@@ -81,6 +90,11 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string): Prom
         redirect: `/games/${gameSlug}?error=${encodeURIComponent("invalid_developer_url")}`
       };
     }
+    
+    console.log('Comparing handles:', {
+      userHandle: xHandle.toLowerCase(),
+      developerHandle: developerHandle.toLowerCase()
+    });
     
     // Check if the handles match (case insensitive)
     if (xHandle.toLowerCase() !== developerHandle.toLowerCase()) {

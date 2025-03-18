@@ -59,8 +59,7 @@ export async function signOut() {
       throw error;
     }
     
-    // Redirect to homepage after sign out
-    window.location.href = '/';
+    return { success: true };
   } catch (error) {
     console.error('Sign out error:', error);
     throw error;

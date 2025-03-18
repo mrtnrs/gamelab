@@ -11,34 +11,70 @@ import { extractHandleFromUrl, claimGame } from '@/utils/supabase-auth';
  * Start the Twitter/X authentication flow
  */
 export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
-  const supabase = await createClient();
-  
-  // Use the absolute URL for the callback
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const redirectUrl = new URL('/auth/callback', baseUrl);
-  
-  // If we have game context, add it to the URL
-  if (gameId && gameSlug) {
-    redirectUrl.searchParams.set('gameId', gameId);
-    redirectUrl.searchParams.set('gameSlug', gameSlug);
+  try {
+    const supabase = await createClient();
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    let redirectUrl = new URL("/auth/callback", origin);
+    
+    if (gameId && gameSlug) {
+      // If we have gameId and gameSlug, add them as query parameters
+      redirectUrl.searchParams.set("gameId", gameId);
+      redirectUrl.searchParams.set("gameSlug", gameSlug);
+    }
+    
+    // Set the game_claim_id cookie if we have a gameId
+    // This is a backup in case the URL parameters get lost
+    if (gameId) {
+      try {
+        const cookieStore = await cookies();
+        cookieStore.set("game_claim_id", gameId, {
+          path: "/",
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 20, // 20 minutes
+        });
+      } catch (cookieError) {
+        console.error("Error setting game_claim_id cookie:", cookieError);
+      }
+    }
+    
+    // Include email scope to request email access
+    // Twitter requires this for Supabase authentication
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+      options: {
+        redirectTo: redirectUrl.toString(),
+        scopes: 'tweet.read users.read email',
+        queryParams: {
+          username: 'true',
+          email: 'true'
+        }
+      },
+    });
+
+    if (error) {
+      console.error('Error starting Twitter auth:', error);
+      const errorUrl = gameSlug 
+        ? `/games/${gameSlug}?error=${encodeURIComponent('auth_failed')}` 
+        : '/auth-error?error=auth_failed';
+      return redirect(errorUrl);
+    }
+
+    if (data?.url) {
+      return redirect(data.url);
+    }
+  } catch (error) {
+    // Check if it's a Next.js redirect (this means we've already redirected)
+    if (error instanceof Error && error.name === 'Redirect') {
+      throw error;
+    }
+    
+    console.error('Unexpected error in Twitter auth:', error);
+    const errorUrl = gameSlug 
+      ? `/games/${gameSlug}?error=${encodeURIComponent('unexpected_error')}` 
+      : '/auth-error?error=unexpected_error';
+    return redirect(errorUrl);
   }
-  
-  // Start the auth flow with Supabase
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'twitter',
-    options: {
-      redirectTo: redirectUrl.toString(),
-      scopes: 'tweet.read users.read',
-    },
-  });
-  
-  if (error) {
-    console.error('Error starting Twitter auth:', error);
-    throw error;
-  }
-  
-  // Return the URL instead of redirecting directly
-  return { url: data.url };
 }
 
 /**

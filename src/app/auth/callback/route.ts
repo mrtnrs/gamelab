@@ -1,56 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase-server';
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { handleAuthCallback } from "@/actions/supabase-auth-actions";
 
-export const runtime = 'edge';
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const error = requestUrl.searchParams.get("error");
+  const errorDescription = requestUrl.searchParams.get("error_description");
+  
+  // Get game context if present
+  const gameId = requestUrl.searchParams.get("gameId");
+  const gameSlug = requestUrl.searchParams.get("gameSlug");
 
-/**
- * Handle the callback from Supabase auth
- * This route is hit after the user authenticates with Twitter
- */
-export async function GET(request: NextRequest) {
-  try {
-    // Extract the code from the URL and validate it exists
-    const requestUrl = new URL(request.url);
-    const code = requestUrl.searchParams.get('code');
-    
-    // Get other query parameters to pass along
-    const gameId = requestUrl.searchParams.get('gameId');
-    const gameSlug = requestUrl.searchParams.get('gameSlug');
-    
-    if (!code) {
-      console.error('No code provided in callback');
-      // Redirect to the error page
-      return NextResponse.redirect(new URL('/auth-error?error=no_code', request.nextUrl.origin));
-    }
-    
-    // Exchange the code for a session using server-side client
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    if (error) {
-      console.error('Error exchanging code for session:', error);
-      return NextResponse.redirect(
-        new URL(`/auth-error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, request.nextUrl.origin)
-      );
-    }
-    
-    // Construct the redirect URL
-    let redirectTo = '/';
-    
-    // If we have game context, redirect to the game page
-    if (gameId && gameSlug) {
-      redirectTo = `/games/${gameSlug}`;
-    }
-    
-    // Redirect to the final destination
-    const finalUrl = new URL(redirectTo, request.nextUrl.origin);
-    if (gameId) finalUrl.searchParams.set('gameId', gameId);
-    
-    return NextResponse.redirect(finalUrl);
-  } catch (error) {
-    console.error('Unexpected error in auth callback:', error);
+  // If there's an error from Twitter/X, redirect to error page
+  if (error) {
+    console.error("Auth provider error:", error, errorDescription);
     return NextResponse.redirect(
-      new URL('/auth-error?error=unexpected', request.nextUrl.origin)
+      new URL(`/auth-error?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(errorDescription || '')}`, 
+      requestUrl.origin)
     );
   }
+
+  // If we have a code, exchange it for a session
+  if (code) {
+    try {
+      const supabase = createRouteHandlerClient({
+        cookies,
+      });
+      
+      // First exchange the code for a session
+      await supabase.auth.exchangeCodeForSession(code);
+      
+      // If we have game context, handle the game claiming
+      if (gameId && gameSlug) {
+        // Now handle the authentication callback with our custom logic
+        const result = await handleAuthCallback(code);
+        
+        if (result.redirect) {
+          return NextResponse.redirect(new URL(result.redirect, requestUrl.origin));
+        }
+      }
+    } catch (error) {
+      console.error("Error exchanging code for session:", error);
+      return NextResponse.redirect(
+        new URL(`/auth-error?error=session_exchange_failed`, requestUrl.origin)
+      );
+    }
+  }
+
+  // Default redirect to home page if nothing else matched
+  return NextResponse.redirect(new URL("/", requestUrl.origin));
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useSearchParams } from "next/navigation";
-import { startAuthWithGameContext } from "@/lib/auth-client"; // Import from our client-side utility
+import { startAuthWithGameContext } from "@/lib/supabase-auth-client"; // Updated import path
 
 interface ClaimGameButtonProps {
   gameId: string;
@@ -36,17 +36,25 @@ export default function ClaimGameButton({
     const error = searchParams.get("error");
 
     if (success === "game-claimed") {
-      if (onGameClaimed) onGameClaimed(); // Let onGameClaimed handle the toast
+      toast.success("Game claimed successfully!");
+      if (onGameClaimed) onGameClaimed();
     } else if (error) {
       const errorMessage = decodeURIComponent(error);
       let displayMessage = "Failed to claim game. Please try again.";
+      
+      // Map error codes to user-friendly messages
       if (errorMessage === "handle-mismatch") {
         displayMessage = "Your X handle does not match the developer URL.";
       } else if (errorMessage === "already_claimed") {
         displayMessage = "This game has already been claimed.";
       } else if (errorMessage === "auth_failed") {
         displayMessage = "Authentication failed. Please try again.";
+      } else if (errorMessage === "missing_user_handle") {
+        displayMessage = "Could not retrieve your X handle. Please ensure you grant the necessary permissions.";
+      } else if (errorMessage === "invalid_developer_url") {
+        displayMessage = "The developer URL is not a valid X profile URL.";
       }
+      
       toast.error(displayMessage);
     }
 
@@ -117,7 +125,7 @@ export default function ClaimGameButton({
               disabled={isLoading}
               className="w-full px-4 py-2 bg-[#000000] text-white rounded-md hover:bg-[#333333] transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span className="text-lg hidden font-bold">𝕏</span>
+              <span className="text-lg font-bold">𝕏</span>
               <span>{isLoading ? "Processing..." : "Sign in with 𝕏"}</span>
             </button>
           </div>
