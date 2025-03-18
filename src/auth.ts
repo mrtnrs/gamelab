@@ -71,7 +71,7 @@ function extractHandleFromUrl(url: string): string {
 async function claimGame(gameId: string, xId: string, xHandle: string) {
   console.log('[claimGame] Starting with:', { gameId, xId, xHandle });
   const { createServerSupabaseClient } = await import("./utils/supabase-admin");
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   try {
     console.log('[claimGame] Executing Supabase update');
@@ -156,7 +156,7 @@ export const {
           // Perform game developer verification and claim process immediately
           try {
             const { createServerSupabaseClient } = await import("./utils/supabase-admin");
-            const supabase = createServerSupabaseClient();
+            const supabase = await createServerSupabaseClient();
             console.log('[signIn Callback] Supabase client created');
 
             const { data: game, error: gameError } = await supabase
@@ -196,72 +196,81 @@ export const {
                 return `/games/${gameSlugCookie}?error=${encodeURIComponent(claimResult.error || "update_failed")}`;
               } else {
                 console.log('[signIn Callback] Running backup update');
-                const { error: functionError } = await supabase.rpc('update_game_claimed_status', {
-                  game_id: gameIdCookie,
-                });
-                console.log('[signIn Callback] Backup update result:', { functionError });
-                if (functionError) {
-                  console.error('[signIn Callback] Backup update failed:', functionError);
+                try {
+                  const { error: functionError } = await supabase.rpc('update_game_claimed_status', {
+                    game_id: gameIdCookie,
+                  });
+                  console.log('[signIn Callback] Backup update result:', { functionError });
+                } catch (rpcError) {
+                  console.error('[signIn Callback] RPC error:', rpcError);
+                  // Continue even if RPC fails
                 }
-                console.log('[signIn Callback] Claim successful');
-                // Save claim result on user for downstream use if needed.
-                extUser.claimResult = {
-                  success: true,
-                  redirect: `/games/${gameSlugCookie}?success=game-claimed`,
-                };
+
+                // Set a cookie to indicate the game is claimed
+                try {
+                  cookieStore.set({
+                    name: 'claimed_game_id',
+                    value: gameIdCookie,
+                    path: '/',
+                    maxAge: 60 * 60 * 24 * 30, // 30 days
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                  });
+                  
+                  // Clear the claim cookies
+                  cookieStore.set({
+                    name: 'game_claim_id',
+                    value: '',
+                    path: '/',
+                    maxAge: 0,
+                  });
+                  cookieStore.set({
+                    name: 'game_claim_slug',
+                    value: '',
+                    path: '/',
+                    maxAge: 0,
+                  });
+                } catch (cookieError) {
+                  console.error('[signIn Callback] Cookie error:', cookieError);
+                }
+
+                console.log('[signIn Callback] Claim successful, redirecting');
+                return `/games/${gameSlugCookie}?success=game-claimed`;
               }
             }
-
-            console.log('[signIn Callback] Clearing cookies');
-            const cookieStoreClear = await cookies();
-            cookieStoreClear.delete("game_claim_id");
-            cookieStoreClear.delete("game_claim_slug");
           } catch (error) {
-            console.error('[signIn Callback] Error in game claim process:', error);
+            console.error('[signIn Callback] Error during claim process:', error);
             return `/games/${gameSlugCookie}?error=${encodeURIComponent("unexpected_error")}`;
           }
         }
       }
-      console.log('[signIn Callback] Complete:', { user });
-      
-      return extUser.claimResult?.redirect ?? true;
-
-      //return true;
+      return true;
     },
     async jwt({ token, account, profile, user }) {
       console.log('[jwt Callback] Starting with:', { token, account, profile, user });
-      if (account && account.provider === "twitter" && profile && "data" in profile) {
-        const twitterProfile = profile as unknown as TwitterProfile;
-        token.accessToken = account.access_token;
-        token.xId = twitterProfile.data.id;
-        token.xHandle = twitterProfile.data.username;
-        console.log('[jwt Callback] Twitter data added:', { xId: token.xId, xHandle: token.xHandle });
-      }
-
       if (user) {
         const extUser = user as ExtendedUser;
-        if (extUser.gameId && extUser.gameSlug) {
-          token.gameId = extUser.gameId;
-          token.gameSlug = extUser.gameSlug;
-          console.log('[jwt Callback] Game context added:', { gameId: token.gameId, gameSlug: token.gameSlug });
-        }
+        token.xId = extUser.xId;
+        token.xHandle = extUser.xHandle;
+        token.gameId = extUser.gameId;
+        token.gameSlug = extUser.gameSlug;
+        token.claimResult = extUser.claimResult;
+        console.log('[jwt Callback] Token updated with user data:', token);
       }
-
-      console.log('[jwt Callback] Complete:', token);
       return token;
     },
     async session({ session, token }) {
       console.log('[session Callback] Starting with:', { session, token });
-      const extendedSession = session as ExtendedSession;
-
-      if (token && extendedSession.user) {
-        extendedSession.user.xId = token.xId as string;
-        extendedSession.user.xHandle = token.xHandle as string;
-        console.log('[session Callback] User updated:', extendedSession.user);
+      const extSession = session as ExtendedSession;
+      if (extSession.user) {
+        extSession.user.xId = token.xId as string;
+        extSession.user.xHandle = token.xHandle as string;
+        extSession.user.gameId = token.gameId as string;
+        extSession.user.gameSlug = token.gameSlug as string;
+        extSession.user.claimResult = token.claimResult as any;
       }
-
-      console.log('[session Callback] Complete:', extendedSession);
-      return extendedSession;
+      console.log('[session Callback] Session updated with token data:', extSession);
+      return extSession;
     },
   },
 });

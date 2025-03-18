@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "@/components/auth-provider";
 import GameAuthProvider from "@/components/game-auth-provider";
+import { SupabaseAuthProvider } from "@/components/supabase-auth-provider";
 import { BookmarkProvider } from "@/contexts/bookmark-context";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
@@ -88,12 +89,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <GameAuthProvider>
-              <BookmarkProvider>
-                {children}
-                
-              </BookmarkProvider>
-            </GameAuthProvider>
+            <SupabaseAuthProvider>
+              <GameAuthProvider>
+                <BookmarkProvider>
+                  {children}
+                  
+                </BookmarkProvider>
+              </GameAuthProvider>
+            </SupabaseAuthProvider>
           </AuthProvider>
           <Toaster position="top-right" />
         </ThemeProvider>

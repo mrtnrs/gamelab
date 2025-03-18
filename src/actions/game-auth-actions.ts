@@ -22,7 +22,7 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
     }
 
     // Get the game from the database
-    const supabase = createServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { data: game, error } = await supabase
       .from('games')
       .select('developer_url, claimed')
@@ -110,28 +110,45 @@ export async function verifyAndClaimGame(gameId: string, gameSlug: string) {
  * Check if the current authenticated user is the developer of a game
  * This is a server-side function that can be used in server components
  */
-// export async function isGameDeveloper(gameId: string): Promise<boolean> {
-//   try {
-//     const session = await auth();
+export async function isGameDeveloper(gameId: string): Promise<boolean> {
+  try {
+    // Get the current session
+    const session = await auth();
     
-//     if (!session?.user?.xId) {
-//       return false;
-//     }
-
-//     const supabase = createServerSupabaseClient();
-//     const { data, error } = await supabase
-//       .from('games')
-//       .select('developer_twitter_id, claimed')
-//       .eq('id', gameId)
-//       .single();
-
-//     if (error || !data || !data.claimed) {
-//       return false;
-//     }
-
-//     return data.developer_twitter_id === session.user.xId;
-//   } catch (error) {
-//     console.error('Error checking if user is game developer:', error);
-//     return false;
-//   }
-// }
+    if (!session?.user?.xId || !session?.user?.xHandle) {
+      return false;
+    }
+    
+    // Get the game from the database
+    const supabase = await createServerSupabaseClient();
+    const { data: game, error } = await supabase
+      .from('games')
+      .select('developer_url')
+      .eq('id', gameId)
+      .single();
+      
+    if (error || !game) {
+      return false;
+    }
+    
+    // Extract the Twitter handle from the developer URL
+    const developerUrl = game.developer_url || "";
+    const isXUrl = developerUrl && 
+      (developerUrl.includes("twitter.com/") || developerUrl.includes("x.com/"));
+    
+    if (!isXUrl) {
+      return false;
+    }
+    
+    // Extract the handle from the URL
+    const urlParts = developerUrl.split("/");
+    const expectedHandle = urlParts[urlParts.length - 1].toLowerCase();
+    const userHandle = session.user.xHandle.toLowerCase();
+    
+    // Verify that the authenticated user's handle matches the developer URL
+    return expectedHandle === userHandle;
+  } catch (error) {
+    console.error('Error in isGameDeveloper:', error);
+    return false;
+  }
+}

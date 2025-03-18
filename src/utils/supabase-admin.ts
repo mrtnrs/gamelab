@@ -1,8 +1,10 @@
 // src/utils/supabase-admin.ts
+'use server';
+
 import { createClient } from "@supabase/supabase-js";
 
 // Create a Supabase client with the service role key (server-side only)
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
