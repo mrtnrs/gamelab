@@ -37,7 +37,7 @@ export async function createChangelog(data: {
   }
 
   // Create Supabase client and fetch game details.
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: game, error: gameError } = await supabase
     .from("games")
     .select("developer_url, claimed")
@@ -96,7 +96,7 @@ export async function updateChangelog(
   }
 
   // Create Supabase client and fetch game details.
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: game, error: gameError } = await supabase
     .from("games")
     .select("developer_url, claimed")
@@ -146,7 +146,7 @@ export async function deleteChangelog(
   gameId: string
 ): Promise<void> {
   // Retrieve the current session
-  console.log("[cdeleteChangelog] Invoked with data:", id, gameId);
+  console.log("[deleteChangelog] Invoked with data:", id, gameId);
 
   const session = await auth();
   if (!session?.user) {
@@ -154,7 +154,7 @@ export async function deleteChangelog(
   }
 
   // Create Supabase client and fetch game details.
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   const { data: game, error: gameError } = await supabase
     .from("games")
     .select("developer_url, claimed")
