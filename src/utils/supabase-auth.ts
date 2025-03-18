@@ -1,7 +1,6 @@
 // src/utils/supabase-auth.ts
-import { createServerClient } from './supabase-client';
+import { getSupabaseBrowserClient } from './supabase-client';
 import { createServerSupabaseClient } from './supabase-admin';
-import { cookies } from 'next/headers';
 
 /**
  * Extract Twitter/X handle from a URL
@@ -21,7 +20,7 @@ export function extractHandleFromUrl(url: string): string | null {
  * Get the current authenticated user from Supabase
  */
 export async function getCurrentUser(): Promise<any> {
-  const supabase = await createServerClient();
+  const supabase = await getSupabaseBrowserClient();
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user || null;
 }
@@ -51,7 +50,7 @@ export async function isGameDeveloper(gameId: string): Promise<boolean> {
     if (!userHandle) return false;
     
     // Get the game's developer URL
-    const supabase = await createServerClient();
+    const supabase = await getSupabaseBrowserClient();
     const { data: game, error } = await supabase
       .from('games')
       .select('developer_url')
@@ -103,7 +102,7 @@ export async function claimGame(gameId: string): Promise<{ success: boolean; err
     }
     
     // Get the game's developer URL
-    const supabase = await createServerClient();
+    const supabase = await getSupabaseBrowserClient();
     const { data: game, error } = await supabase
       .from('games')
       .select('developer_url, claimed')
@@ -147,22 +146,8 @@ export async function claimGame(gameId: string): Promise<{ success: boolean; err
       // We don't fail the entire operation if just the RPC fails
     }
     
-    // Store the game ID in a cookie for the current session
-    try {
-      // Use the synchronous cookies() function
-      const cookieStore = await cookies();
-      cookieStore.set({
-        name: 'claimed_game_id',
-        value: gameId,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-      });
-    } catch (error) {
-      console.error('Error setting cookie:', error);
-      // Continue even if cookie setting fails
-    }
+    // Note: Cookie setting must be done in a Server Action, not here
+    // This function should be called from a Server Action that handles cookie setting
     
     return { success: true };
   } catch (error) {

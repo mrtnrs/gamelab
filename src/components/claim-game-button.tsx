@@ -66,11 +66,10 @@ export default function ClaimGameButton({
       // Use the client-side authentication utility
       await startAuthWithGameContext(gameId, gameSlug);
       
-      // The Auth.js implementation will handle the redirect
+      // The redirect will be handled in the startAuthWithGameContext function
     } catch (error) {
       console.error('Error starting authentication:', error);
       toast.error('Failed to start authentication. Please try again.');
-    } finally {
       setIsLoading(false);
       setIsOpen(false);
     }
@@ -110,7 +109,7 @@ export default function ClaimGameButton({
             </div>
             <p className="text-muted-foreground mb-6">
               {claimed
-                ? "Sign in with your X account to verify you’re the developer."
+                ? "Sign in with your X account to verify you're the developer."
                 : "Verify ownership by signing in with your X account. Your handle must match the developer URL."}
             </p>
             <button

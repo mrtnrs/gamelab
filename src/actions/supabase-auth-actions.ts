@@ -3,7 +3,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createServerClient } from '@/utils/supabase-client';
+import { getSupabaseBrowserClient } from '@/utils/supabase-client';
 import { createServerSupabaseClient } from '@/utils/supabase-admin';
 import { extractHandleFromUrl } from '@/utils/supabase-auth';
 
@@ -11,7 +11,7 @@ import { extractHandleFromUrl } from '@/utils/supabase-auth';
  * Start the Twitter/X authentication flow
  */
 export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
-  const supabase = await createServerClient();
+  const supabase = await getSupabaseBrowserClient();
   
   // Set up the auth redirect URL
   const redirectUrl = new URL('/auth/supabase-callback', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
@@ -73,7 +73,7 @@ export async function handleAuthCallback(code: string) {
     const gameSlug = cookieStore.get('game_claim_slug')?.value;
     
     // Exchange the code for a session
-    const supabase = await createServerClient();
+    const supabase = await getSupabaseBrowserClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (error) {
@@ -226,7 +226,7 @@ export async function handleAuthCallback(code: string) {
  * Sign out the current user
  */
 export async function signOut() {
-  const supabase = await createServerClient();
+  const supabase = await getSupabaseBrowserClient();
   await supabase.auth.signOut();
   
   // Clear any auth cookies
@@ -252,7 +252,7 @@ export async function signOut() {
 export async function checkIsGameDeveloper(gameId: string): Promise<boolean> {
   try {
     // Get the current session
-    const supabase = await createServerClient();
+    const supabase = await getSupabaseBrowserClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.user) return false;
