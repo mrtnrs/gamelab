@@ -14,7 +14,7 @@ export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
   try {
     const supabase = await createClient();
     const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    let redirectUrl = new URL("/auth/callback", origin);
+    let redirectUrl = new URL("/auth/supabase-callback", origin);
     
     if (gameId && gameSlug) {
       // If we have gameId and gameSlug, add them as query parameters
