@@ -2,7 +2,6 @@
 'use server';
 
 import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/utils/supabase-client';
 import { createClient, createServiceClient } from '@/utils/supabase-server';
 import { extractHandleFromUrl, claimGame } from '@/utils/supabase-auth';
@@ -54,26 +53,28 @@ export async function startTwitterAuth(gameId?: string, gameSlug?: string) {
 
     if (error) {
       console.error('Error starting Twitter auth:', error);
-      const errorUrl = gameSlug 
-        ? `/games/${gameSlug}?error=${encodeURIComponent('auth_failed')}` 
-        : '/auth-error?error=auth_failed';
-      return redirect(errorUrl);
+      // Return an error object instead of redirecting
+      return { 
+        error: 'auth_failed', 
+        errorMessage: error.message,
+        errorUrl: gameSlug 
+          ? `/games/${gameSlug}?error=${encodeURIComponent('auth_failed')}` 
+          : '/auth-error?error=auth_failed'
+      };
     }
 
     if (data?.url) {
-      return redirect(data.url);
-    }
-  } catch (error) {
-    // Check if it's a Next.js redirect (this means we've already redirected)
-    if (error instanceof Error && error.name === 'Redirect') {
-      throw error;
+      // Return the URL instead of redirecting
+      return { url: data.url };
     }
     
+    return { error: 'no_url_returned', errorMessage: 'No URL was returned from Supabase' };
+  } catch (error) {
     console.error('Unexpected error in Twitter auth:', error);
-    const errorUrl = gameSlug 
-      ? `/games/${gameSlug}?error=${encodeURIComponent('unexpected_error')}` 
-      : '/auth-error?error=unexpected_error';
-    return redirect(errorUrl);
+    return { 
+      error: 'unexpected_error',
+      errorMessage: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 

@@ -17,9 +17,42 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
   document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
   
   try {
-    // Call the server action to start the auth flow
-    // The function now handles redirects internally and doesn't return a URL
-    await startTwitterAuth(gameId, gameSlug);
+    // Create a direct Supabase client instead of calling server action
+    const supabase = await getSupabaseBrowserClient();
+    
+    // Get the base URL for redirect
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    const redirectUrl = new URL("/auth/supabase-callback", baseUrl);
+    
+    // Add game context as query parameters
+    redirectUrl.searchParams.set("gameId", gameId);
+    redirectUrl.searchParams.set("gameSlug", gameSlug);
+    
+    // Sign in with OAuth directly
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+      options: {
+        redirectTo: redirectUrl.toString(),
+        scopes: 'tweet.read users.read email',
+        queryParams: {
+          username: 'true',
+          email: 'true'
+        }
+      }
+    });
+    
+    if (error) {
+      console.error('Error starting Twitter auth:', error);
+      throw new Error(error.message);
+    }
+    
+    if (data?.url) {
+      // Redirect to the auth URL
+      window.location.href = data.url;
+      return;
+    }
+    
+    throw new Error('No URL returned from authentication provider');
   } catch (error) {
     console.error('Error starting Twitter auth:', error);
     throw error;
@@ -39,7 +72,7 @@ export async function signOutUser() {
     const supabase = await getSupabaseBrowserClient();
     await supabase.auth.signOut();
     
-    // Refresh the page to update UI
+    // Reload the page to update the UI
     window.location.href = '/';
   } catch (error) {
     console.error('Error signing out:', error);
@@ -54,8 +87,8 @@ export async function signOutUser() {
 export async function getCurrentUser() {
   try {
     const supabase = await getSupabaseBrowserClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    const { data } = await supabase.auth.getUser();
+    return data?.user || null;
   } catch (error) {
     console.error('Error getting current user:', error);
     return null;
