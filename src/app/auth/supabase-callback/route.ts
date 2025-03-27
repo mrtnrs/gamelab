@@ -1,4 +1,5 @@
 // src/app/auth/supabase-callback/route.ts
+export const runtime = 'edge'; 
 import { type NextRequest, NextResponse } from 'next/server';
 // cookies() is used internally by createClient (via @supabase/ssr), no need to import here
 import { createClient } from '@/utils/supabase-server'; // Your UPDATED async server client using @supabase/ssr
