@@ -35,7 +35,9 @@ export default function SupabaseCallbackPage() {
           setMessage(queryErrorDesc || queryError || 'Authentication failed.');
           setStatus('error');
           // Provide fallback for queryError
-          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(queryError || 'unknown_query_error')}&message=${encodeURIComponent(queryErrorDesc || '')}`), 3000);
+          const queryErrorCode = queryError ? encodeURIComponent(queryError) : 'unknown_query_error';
+          const queryErrorMessage = encodeURIComponent(queryErrorDesc || '');
+          setTimeout(() => router.replace(`/auth-error?error=${queryErrorCode}&message=${queryErrorMessage}`), 3000);
           return;
       }
 
@@ -49,9 +51,13 @@ export default function SupabaseCallbackPage() {
           console.error('Error in URL hash:', hashData.error, hashData.error_description);
           setMessage(hashData.error_description || hashData.error || 'Authentication failed.');
           setStatus('error');
-          // *** THIS IS THE CORRECTED LINE ***
-          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(hashData.error || 'unknown_hash_error')}&message=${encodeURIComponent(hashData.error_description || '')}`), 3000);
+
+          // *** THIS IS THE CORRECTED SECTION (using Ternary Operator) ***
+          const errorCode = hashData.error ? encodeURIComponent(hashData.error) : 'unknown_hash_error';
+          const errorMessage = encodeURIComponent(hashData.error_description || '');
+          setTimeout(() => router.replace(`/auth-error?error=${errorCode}&message=${errorMessage}`), 3000);
           // *** END CORRECTION ***
+
           return;
       }
 
