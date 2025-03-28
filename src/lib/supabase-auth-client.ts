@@ -1,7 +1,9 @@
+// src/lib/supabase-auth-client.ts
 "use client";
 
-import { startTwitterAuth, signOut } from '@/actions/supabase-auth-actions';
-import { getSupabaseBrowserClient } from '@/utils/supabase-client';
+// Assuming signOut is needed and defined elsewhere, e.g., src/actions/supabase-auth-actions.ts
+import { signOut } from '@/actions/supabase-auth-actions';
+import { getSupabaseBrowserClient } from '@/utils/supabase-client'; // Use browser client utility
 
 /**
  * Start authentication with game context from the client side
@@ -11,51 +13,50 @@ import { getSupabaseBrowserClient } from '@/utils/supabase-client';
  */
 export async function startAuthWithGameContext(gameId: string, gameSlug: string) {
   console.log('Starting Supabase auth with game context:', { gameId, gameSlug });
-  
-  // Store game context in cookies on the client side as a backup
-  document.cookie = `game_claim_id=${encodeURIComponent(gameId)}; path=/;`;
-  document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/;`;
-  
+
+  // Optional: Store game context in cookies as a backup - client-side cookies are fine
+  document.cookie = `game_claim_id=${encodeURIComponent(gameId)}; path=/; max-age=600; SameSite=Lax; Secure=${window.location.protocol === 'https:'}`;
+  document.cookie = `game_claim_slug=${encodeURIComponent(gameSlug)}; path=/; max-age=600; SameSite=Lax; Secure=${window.location.protocol === 'https:'}`;
+
   try {
-    // Create a direct Supabase client instead of calling server action
-    const supabase = await getSupabaseBrowserClient();
-    
+    const supabase = getSupabaseBrowserClient(); // Use browser client here
+
     // Get the base URL for redirect
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    // This MUST point to the client-side page route
     const redirectUrl = new URL("/auth/supabase-callback", baseUrl);
-    
-    // Add game context as query parameters
+
+    // Add game context as query parameters (these will persist)
     redirectUrl.searchParams.set("gameId", gameId);
     redirectUrl.searchParams.set("gameSlug", gameSlug);
-    
+
     // Sign in with OAuth directly
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'twitter',
       options: {
         redirectTo: redirectUrl.toString(),
-        scopes: 'tweet.read users.read email',
-        queryParams: {
-          username: 'true',
-          email: 'true'
-        }
+        // Add scopes if needed by your app/X.com app config
+        // scopes: 'tweet.read users.read offline.access',
       }
     });
-    
+
     if (error) {
       console.error('Error starting Twitter auth:', error);
       throw new Error(error.message);
     }
-    
+
     if (data?.url) {
-      // Redirect to the auth URL
+      // Redirect the user's browser to the X.com authorization URL
       window.location.href = data.url;
-      return;
+      return; // Stop execution here
     }
-    
-    throw new Error('No URL returned from authentication provider');
+
+    // Should not happen if Supabase provider is configured
+    throw new Error('No authorization URL returned from authentication provider');
   } catch (error) {
-    console.error('Error starting Twitter auth:', error);
-    throw error;
+    console.error('Error in startAuthWithGameContext:', error);
+    // Consider showing an error toast to the user here
+    throw error; // Re-throw for the calling component (e.g., button) to handle
   }
 }
 
@@ -65,14 +66,13 @@ export async function startAuthWithGameContext(gameId: string, gameSlug: string)
  */
 export async function signOutUser() {
   try {
-    // Call the server action to sign out
-    await signOut();
-    
-    // Also sign out on the client side for complete session cleanup
-    const supabase = await getSupabaseBrowserClient();
+    const supabase = getSupabaseBrowserClient();
+    // Sign out on client first
     await supabase.auth.signOut();
-    
-    // Reload the page to update the UI
+    // Optionally call server-side sign out if needed, but client-side is primary
+    // await signOut(); // If signOut server action does more cleanup
+
+    // Redirect to home or refresh
     window.location.href = '/';
   } catch (error) {
     console.error('Error signing out:', error);
@@ -86,9 +86,10 @@ export async function signOutUser() {
  */
 export async function getCurrentUser() {
   try {
-    const supabase = await getSupabaseBrowserClient();
-    const { data } = await supabase.auth.getUser();
-    return data?.user || null;
+    const supabase = getSupabaseBrowserClient();
+    // getSession is often preferred over getUser for checking auth state
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.user || null;
   } catch (error) {
     console.error('Error getting current user:', error);
     return null;

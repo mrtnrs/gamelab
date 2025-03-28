@@ -1,59 +1,67 @@
 // src/utils/supabase-server.ts
-"use server"; // Keep this if you need to call these functions from client components via Server Actions
-
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+// Use the standard @supabase/ssr setup for server clients
+// Assumes this doesn't cause the Edge error when called from Server Actions
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { SupabaseClient } from '@supabase/supabase-js';
 
-// Creates a Supabase client for server-side use (Route Handlers, Server Actions)
-// Reads cookies using a custom fetch wrapper but does NOT automatically set them.
+// Use this for Server Components, Server Actions, Route Handlers (if any were used)
 export async function createClient(): Promise<SupabaseClient> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Must be async to await cookies() in newer Next.js
+  const cookieStore = await cookies()
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase URL or Anon Key');
-  }
-
-  const cookieStore = await cookies(); // Needs await
-
-  return createSupabaseClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    },
-    global: {
-      // Custom fetch wrapper to inject auth cookies into outgoing Supabase requests
-      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        const allCookies = cookieStore.getAll();
-        // Find the standard Supabase auth token cookie format
-        const sbAuthCookie = allCookies.find(cookie => cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token'));
-        const headers = new Headers(init?.headers);
-
-        if (sbAuthCookie) {
-          headers.set('Cookie', `${sbAuthCookie.name}=${sbAuthCookie.value}`);
-        }
-
-        const finalInit = { ...init, headers };
-        return fetch(url, finalInit);
-      }
+  // Create and return the Supabase client configured for server-side rendering/actions
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        // Function to get a cookie by name
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        // Function to set a cookie (important for session refresh, etc.)
+        set(name: string, value: string, options: CookieOptions) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing sessions.
+            console.warn(`Failed to set cookie '${name}' from server component/action. Middleware might be needed for reliable refresh. Error: ${error}`);
+          }
+        },
+        // Function to remove a cookie
+        remove(name: string, options: CookieOptions) {
+          try {
+            // Set value to empty string with expiry in the past to delete
+            cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
+             console.warn(`Failed to remove cookie '${name}' from server component/action. Error: ${error}`);
+          }
+        },
+      },
     }
-  });
+  )
 }
 
-// For administrative operations that require the service role key
+// Client for administrative operations using the Service Role Key
+// This does not need cookie handling as it authenticates with the secret key.
 export async function createServiceClient(): Promise<SupabaseClient> {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase URL or Service Role Key');
+    throw new Error('Missing Supabase URL or Service Role Key for service client');
   }
 
-  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+  // Need to import the base client directly here to avoid cookie logic
+  const { createClient: createBaseSupabaseClient } = await import('@supabase/supabase-js');
+
+  // Create client configured with service role key
+  return createBaseSupabaseClient(supabaseUrl, serviceRoleKey, {
     auth: {
+      // Service role client doesn't persist sessions via cookies
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false
