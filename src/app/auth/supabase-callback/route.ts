@@ -1,11 +1,12 @@
 // src/app/auth/supabase-callback/route.ts
-export const runtime = 'edge'; 
-import { type NextRequest, NextResponse } from 'next/server';
-// cookies() is used internally by createClient (via @supabase/ssr), no need to import here
-import { createClient } from '@/utils/supabase-server'; // Your UPDATED async server client using @supabase/ssr
-import { verifyAndClaimGame } from '@/actions/game-auth-actions'; // Your existing action
+export const runtime = 'edge'; // REQUIRED for Cloudflare Pages
 
-export const dynamic = 'force-dynamic'; // Keep this to ensure it runs dynamically
+import { type NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase-server'; // Use the reverted server client
+import { verifyAndClaimGame } from '@/actions/game-auth-actions';
+import { type Session } from '@supabase/supabase-js'; // Import Session type
+
+export const dynamic = 'force-dynamic'; // Keep this
 
 export async function GET(request: NextRequest) {
     const { searchParams, origin } = new URL(request.url);
@@ -18,82 +19,113 @@ export async function GET(request: NextRequest) {
     const errorDescription = searchParams.get('error_description');
 
     if (error) {
-        console.error('[Auth Callback Route] Error from Supabase/Provider:', { error, errorDescription });
+        console.error('[Auth Callback Route - Manual] Error from Supabase/Provider:', { error, errorDescription });
         const errorRedirectUrl = new URL(gameSlug ? `/games/${gameSlug}` : '/auth-error', origin);
-        // Map specific errors if needed, e.g., access denied
         const errorCode = error === 'access_denied' ? 'AccessDenied' : 'auth_failed';
         errorRedirectUrl.searchParams.set('error', errorCode);
         if (errorDescription) {
-            errorRedirectUrl.searchParams.set('message', errorDescription); // Optional: pass message
+            errorRedirectUrl.searchParams.set('message', errorDescription);
         }
-        // Use NextResponse.redirect to perform the redirect
         return NextResponse.redirect(errorRedirectUrl);
     }
 
     // --- 2. Check for Code ---
     if (!code) {
-        console.error('[Auth Callback Route] No code found in URL.');
+        console.error('[Auth Callback Route - Manual] No code found in URL.');
         const errorRedirectUrl = new URL(gameSlug ? `/games/${gameSlug}` : '/auth-error', origin);
         errorRedirectUrl.searchParams.set('error', 'no_code');
         return NextResponse.redirect(errorRedirectUrl);
     }
 
     // --- 3. Exchange Code for Session ---
-    // Use the updated async createClient. It uses @supabase/ssr and handles cookies internally.
-    const supabase = await createClient(); // Needs await because createClient is now async
+    const supabase = await createClient(); // Use the reverted async client
 
-    // exchangeCodeForSession with the @supabase/ssr client will automatically handle
-    // setting the necessary auth cookie(s) on the response via the options passed to createServerClient
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (exchangeError) {
-        console.error('[Auth Callback Route] Error exchanging code for session:', exchangeError);
+    if (exchangeError || !exchangeData?.session) {
+        console.error('[Auth Callback Route - Manual] Error exchanging code or no session returned:', exchangeError);
         const errorRedirectUrl = new URL(gameSlug ? `/games/${gameSlug}` : '/auth-error', origin);
-        errorRedirectUrl.searchParams.set('error', 'token_exchange_failed'); // Use a specific error code
-        if (exchangeError.message) {
-            errorRedirectUrl.searchParams.set('message', exchangeError.message); // Optional
+        errorRedirectUrl.searchParams.set('error', 'token_exchange_failed');
+        if (exchangeError?.message) {
+             errorRedirectUrl.searchParams.set('message', exchangeError.message);
         }
         return NextResponse.redirect(errorRedirectUrl);
     }
 
-    // --- 4. Code Exchange Successful - Session cookie is implicitly handled by @supabase/ssr ---
-    console.log('[Auth Callback Route] Code exchanged successfully. Session established.');
+    // --- 4. Session Obtained - Prepare Manual Cookie Data ---
+    const session = exchangeData.session as Session;
+    console.log('[Auth Callback Route - Manual] Code exchanged successfully. Session obtained.');
+
+    // Get Supabase project reference for cookie naming
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_REF;
+    if (!projectRef) {
+        console.error("FATAL ERROR: NEXT_PUBLIC_SUPABASE_PROJECT_REF environment variable is not set!");
+        const errorRedirectUrl = new URL('/auth-error', origin);
+        errorRedirectUrl.searchParams.set('error', 'Configuration');
+        errorRedirectUrl.searchParams.set('message', 'Server configuration error: Missing Supabase project reference.');
+        // Return a plain response here, as redirect might cause loops if cookie setting fails later
+        return new NextResponse('Server configuration error', { status: 500 });
+        // return NextResponse.redirect(errorRedirectUrl); // Avoid potential redirect loops if cookie setting fails
+    }
+
+    // Standard Supabase cookie format
+    const cookieName = `sb-${projectRef}-auth-token`;
+    // Store the full session object as a JSON string array (standard practice)
+    const cookieValue = JSON.stringify([session]);
+    const cookieOptions = {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Should be true on Cloudflare
+        maxAge: session.expires_in ?? 3600, // Use expiry from session, fallback to 1 hour
+        sameSite: 'lax' as const // Recommended default
+    };
 
     let finalRedirectUrl: URL;
 
     // --- 5. Proceed with Game Claim (if applicable) ---
-    // verifyAndClaimGame will use the same async createClient. Since the auth cookie was set
-    // by exchangeCodeForSession via @supabase/ssr's mechanisms, createClient will correctly
-    // read it when called inside the action (within the same logical request context).
+    // The verifyAndClaimGame action will call createClient again. The custom fetch wrapper
+    // SHOULD read the existing request cookies, but the NEW session cookie won't be available
+    // until the *next* request after this response is sent. This might be okay if
+    // verifyAndClaimGame primarily relies on info passed as args, not session state itself.
+    // Let's verify if verifyAndClaimGame calls getSession. Yes, it does.
+    // This manual approach might cause verifyAndClaimGame to fail because the cookie isn't readable yet.
+    // **Correction:** Let's call verifyAndClaimGame *before* creating the final response.
+
     if (gameId && gameSlug) {
         try {
-            // Call your existing server action to handle the game claim logic
-            const result = await verifyAndClaimGame(gameId, gameSlug);
-            console.log('[Auth Callback Route] verifyAndClaimGame result:', result);
+            console.log('[Auth Callback Route - Manual] Attempting game claim before final redirect.');
+            // Pass the obtained user object directly if needed, or rely on the action refetching
+            // We MUST ensure the session is somehow available to the action.
+            // The custom fetch wrapper *might* work if the underlying cookieStore reference is shared,
+            // but it's safer to assume it might not see the brand new session yet.
+            // Let's modify verifyAndClaimGame slightly if needed or rely on the args.
+            // Assuming verifyAndClaimGame uses createClient internally and calls getSession:
+            const result = await verifyAndClaimGame(gameId, gameSlug); // This might fail if getSession relies on a cookie not yet sent to browser
+            console.log('[Auth Callback Route - Manual] verifyAndClaimGame result:', result);
 
-            // Use the redirect URL provided by the action
             if (result?.redirect) {
                 finalRedirectUrl = new URL(result.redirect, origin);
             } else {
-                // Fallback logic based on action's success status (should ideally not be needed if action always returns redirect)
-                console.warn('[Auth Callback Route] verifyAndClaimGame did not return redirect. Using fallback.');
                 finalRedirectUrl = new URL(result.success ? `/games/${gameSlug}?success=game-claimed` : `/games/${gameSlug}?error=unknown_claim_error`, origin);
             }
         } catch (claimError) {
-            // Catch errors specifically from calling the action itself
-            console.error('[Auth Callback Route] Error calling verifyAndClaimGame action:', claimError);
+            console.error('[Auth Callback Route - Manual] Error calling verifyAndClaimGame action:', claimError);
             finalRedirectUrl = new URL(`/games/${gameSlug}?error=claim_action_failed`, origin);
         }
     } else {
-        // --- 6. No Game Context - Redirect to Default Location (e.g., Home) ---
-        console.log('[Auth Callback Route] No game context. Redirecting home.');
+        // --- 6. No Game Context - Redirect to Home ---
+        console.log('[Auth Callback Route - Manual] No game context. Redirecting home.');
         finalRedirectUrl = new URL('/', origin);
     }
 
-    // --- 7. Redirect to the final destination ---
-    // *** No manual cookie setting needed here! ***
-    // NextResponse.redirect() will automatically include the cookies set by
-    // the supabase client (due to the @supabase/ssr setup).
-    console.log(`[Auth Callback Route] Redirecting to ${finalRedirectUrl}`);
-    return NextResponse.redirect(finalRedirectUrl);
+    // --- 7. Create final response and MANUALLY SET THE AUTH COOKIE ---
+    console.log(`[Auth Callback Route - Manual] Redirecting to ${finalRedirectUrl} and setting cookie ${cookieName}`);
+    // Create the redirect response *first*
+    const response = NextResponse.redirect(finalRedirectUrl);
+
+    // *Then* set the cookie on that response object
+    response.cookies.set(cookieName, cookieValue, cookieOptions);
+
+    // Return the response with the cookie set
+    return response;
 }
