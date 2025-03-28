@@ -34,8 +34,8 @@ export default function SupabaseCallbackPage() {
           console.error('Error in query params:', queryError, queryErrorDesc);
           setMessage(queryErrorDesc || queryError || 'Authentication failed.');
           setStatus('error');
-          // Redirect to error page after a delay
-          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(queryError)}&message=${encodeURIComponent(queryErrorDesc || '')}`), 3000);
+          // Provide fallback for queryError
+          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(queryError || 'unknown_query_error')}&message=${encodeURIComponent(queryErrorDesc || '')}`), 3000);
           return;
       }
 
@@ -49,7 +49,9 @@ export default function SupabaseCallbackPage() {
           console.error('Error in URL hash:', hashData.error, hashData.error_description);
           setMessage(hashData.error_description || hashData.error || 'Authentication failed.');
           setStatus('error');
-          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(hashData.error)}&message=${encodeURIComponent(hashData.error_description || '')}`), 3000);
+          // *** THIS IS THE CORRECTED LINE ***
+          setTimeout(() => router.replace(`/auth-error?error=${encodeURIComponent(hashData.error || 'unknown_hash_error')}&message=${encodeURIComponent(hashData.error_description || '')}`), 3000);
+          // *** END CORRECTION ***
           return;
       }
 
