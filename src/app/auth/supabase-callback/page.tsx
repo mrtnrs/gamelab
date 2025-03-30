@@ -6,16 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/utils/supabase-client'; // Use the browser client utility
 import { verifyAndClaimGame } from '@/actions/game-auth-actions'; // Your server action
 
-// Define expected shape of hash params from Implicit Grant flow
-interface HashParams {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: string;
-    token_type?: string;
-    provider_token?: string; // X.com specific
-    error?: string;            // Error code if auth failed
-    error_description?: string; // Error description if auth failed
+// Define expected shape of the response from the Cloudflare Worker
+interface WorkerExchangeResponse {
+    session?: {
+        access_token: string;
+        refresh_token: string;
+        expires_in?: number;
+        token_type?: string;
+    };
+    user?: any; // Adjust based on what your worker returns for the user object
+    error?: string;
+    message?: string;
 }
+
 
 export default function SupabaseCallbackPage() {
   const router = useRouter();
@@ -26,9 +29,12 @@ export default function SupabaseCallbackPage() {
   const handleCallback = useCallback(async () => {
     try {
       setMessage('Processing authentication callback...');
-      console.log("Callback page loaded. Current URL:", window.location.href); // Log entry point
+      console.log("Callback page loaded. Current URL:", window.location.href);
 
-      // 1. Check for errors in query parameters (less likely now, but good practice)
+      // --- Configuration ---
+      const workerUrl = 'https://gamelabworker.pandabutcher.workers.dev/'; // Your worker URL
+
+      // 1. Check for errors passed directly in query parameters by Supabase/Provider
       const queryError = searchParams.get('error');
       const queryErrorDesc = searchParams.get('error_description');
       if (queryError) {
@@ -41,60 +47,87 @@ export default function SupabaseCallbackPage() {
           return;
       }
 
-      // 2. Parse the hash fragment (#) where tokens should be
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const hashData: HashParams = Object.fromEntries(params.entries());
-      console.log("Parsed hash data:", hashData); // Log parsed hash
+      // 2. Get the authorization code from the query parameters
+      const code = searchParams.get('code');
 
-      // 3. Check for errors provided in the hash fragment
-      if (hashData.error) {
-          console.error('Error found in URL hash:', { error: hashData.error, description: hashData.error_description });
-          setMessage(hashData.error_description || hashData.error || 'Authentication failed.');
+      if (!code) {
+          // If there's no code and no error, something is wrong (e.g., user landed here directly)
+          console.error('Callback page reached without authorization code or error.');
+          setMessage('Invalid callback state. Missing authorization code.');
           setStatus('error');
-          const errorCode = hashData.error ? encodeURIComponent(hashData.error) : 'unknown_hash_error';
-          const errorMessage = encodeURIComponent(hashData.error_description || '');
-          setTimeout(() => router.replace(`/auth-error?error=${errorCode}&message=${errorMessage}`), 3000);
+          setTimeout(() => router.replace('/auth-error?error=missing_code'), 3000);
           return;
       }
 
-      // 4. Check for essential tokens (access_token, refresh_token) in HASH
-      if (!hashData.access_token || !hashData.refresh_token) {
-          // Check if maybe code was sent accidentally in query (shouldn't happen if Implicit Grant is used)
-          if(searchParams.get('code')) {
-              console.error('Received code in query params, but expected tokens in hash. Flow mismatch.');
-              setMessage('Authentication flow mismatch. Please ensure Supabase settings are correct and try again.');
-              setStatus('error');
-              setTimeout(() => router.replace('/auth-error?error=auth_flow_mismatch'), 3000);
-          } else {
-              console.error('Missing required tokens (access_token or refresh_token) in URL hash fragment.');
-              setMessage('Authentication incomplete. Required tokens not found in URL.');
-              setStatus('error');
-              setTimeout(() => router.replace('/auth-error?error=missing_tokens'), 3000);
+      // 3. Exchange the code using the Cloudflare Worker
+      console.log("Found authorization code. Attempting exchange via worker...");
+      setMessage('Exchanging authorization code...');
+      setStatus('processing');
+
+      let workerResponse: WorkerExchangeResponse;
+      try {
+          const response = await fetch(workerUrl, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                  action: 'exchangeCode',
+                  code: code,
+              }),
+          });
+
+          if (!response.ok) {
+              // Try to parse error from worker response body
+              let errorBody = { error: `Worker request failed with status ${response.status}`, message: '' };
+              try {
+                  errorBody = await response.json();
+              } catch (e) { /* Ignore parsing error */ }
+              console.error('Error response from worker:', response.status, errorBody);
+              throw new Error(errorBody.message || errorBody.error || `Worker request failed: ${response.status}`);
           }
+
+          workerResponse = await response.json();
+          console.log("Received response from worker:", workerResponse);
+
+      } catch (fetchError) {
+          console.error('Error calling Cloudflare Worker:', fetchError);
+          setMessage(`Failed to communicate with authentication service: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+          setStatus('error');
+          setTimeout(() => router.replace('/auth-error?error=worker_fetch_failed'), 3000);
           return;
       }
 
-      // 5. Set the session using the browser client with tokens from HASH
-      console.log("Attempting to set session with received tokens...");
+      // 4. Check for errors returned by the worker
+      if (workerResponse.error || !workerResponse.session?.access_token || !workerResponse.session?.refresh_token) {
+          console.error('Worker returned an error or incomplete session data:', workerResponse);
+          setMessage(workerResponse.message || workerResponse.error || 'Failed to exchange code.');
+          setStatus('error');
+          const errorCode = workerResponse.error ? encodeURIComponent(workerResponse.error) : 'worker_exchange_failed';
+          setTimeout(() => router.replace(`/auth-error?error=${errorCode}`), 3000);
+          return;
+      }
+
+      // 5. Set the session client-side using tokens received from the worker
+      console.log("Worker exchange successful. Setting session client-side...");
       const supabase = getSupabaseBrowserClient();
       const { error: sessionError } = await supabase.auth.setSession({
-          access_token: hashData.access_token,
-          refresh_token: hashData.refresh_token,
+          access_token: workerResponse.session.access_token,
+          refresh_token: workerResponse.session.refresh_token,
       });
 
       if (sessionError) {
-          console.error('Error setting session using supabase.auth.setSession:', sessionError);
-          setMessage(`Failed to establish local session: ${sessionError.message}`);
+          console.error('Error setting session using supabase.auth.setSession after worker exchange:', sessionError);
+          setMessage(`Failed to establish local session after code exchange: ${sessionError.message}`);
           setStatus('error');
-          setTimeout(() => router.replace('/auth-error?error=session_error'), 3000);
+          setTimeout(() => router.replace('/auth-error?error=session_set_failed'), 3000);
           return;
       }
 
       // --- Session is now established client-side ---
-      console.log('Supabase session established successfully client-side.');
-      setStatus('processing');
+      console.log('Supabase session established successfully via worker exchange.');
       setMessage('Session established. Checking game claim status...');
+      // Status remains 'processing' while we check the claim
 
       // 6. Get game context from query parameters (passed along by Supabase redirect)
       const gameId = searchParams.get('gameId');
