@@ -49,8 +49,21 @@ export default function SupabaseCallbackPage() {
 
       // 2. Get the authorization code and retrieve the PKCE code verifier
       const code = searchParams.get('code');
+
+      // --- DEBUG: Log sessionStorage contents ---
+      try {
+        console.log('Session Storage Contents:', JSON.stringify(sessionStorage));
+      } catch (e) {
+        console.error("Could not stringify sessionStorage:", e);
+        // Log keys individually if stringify fails
+        Object.keys(sessionStorage).forEach(key => {
+            console.log(`Session Storage Key: ${key} | Value: ${sessionStorage.getItem(key)}`); // Log value too
+        });
+      }
+      // --- END DEBUG ---
+
       // Supabase SSR client typically stores the verifier in sessionStorage
-      const codeVerifier = sessionStorage.getItem('supabase.auth.codeVerifier');
+      const codeVerifier = sessionStorage.getItem('supabase.auth.codeVerifier'); // Attempt with the default key
 
       if (!code) {
           // If there's no code and no error, something is wrong (e.g., user landed here directly)
