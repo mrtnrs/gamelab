@@ -47,8 +47,10 @@ export default function SupabaseCallbackPage() {
           return;
       }
 
-      // 2. Get the authorization code from the query parameters
+      // 2. Get the authorization code and retrieve the PKCE code verifier
       const code = searchParams.get('code');
+      // Supabase SSR client typically stores the verifier in sessionStorage
+      const codeVerifier = sessionStorage.getItem('supabase.auth.codeVerifier');
 
       if (!code) {
           // If there's no code and no error, something is wrong (e.g., user landed here directly)
@@ -59,8 +61,17 @@ export default function SupabaseCallbackPage() {
           return;
       }
 
-      // 3. Exchange the code using the Cloudflare Worker
-      console.log("Found authorization code. Attempting exchange via worker...");
+      if (!codeVerifier) {
+          // This shouldn't happen if the auth flow started correctly with PKCE
+          console.error('Callback page cannot find PKCE code verifier in sessionStorage.');
+          setMessage('Invalid authentication state. Missing PKCE verifier.');
+          setStatus('error');
+          setTimeout(() => router.replace('/auth-error?error=missing_code_verifier'), 3000);
+          return;
+      }
+
+      // 3. Exchange the code using the Cloudflare Worker, now including the codeVerifier
+      console.log("Found authorization code and PKCE verifier. Attempting exchange via worker...");
       setMessage('Exchanging authorization code...');
       setStatus('processing');
 
@@ -74,8 +85,12 @@ export default function SupabaseCallbackPage() {
               body: JSON.stringify({
                   action: 'exchangeCode',
                   code: code,
+                  codeVerifier: codeVerifier, // Send the verifier to the worker
               }),
           });
+
+          // Clean up the verifier from storage after sending it
+          sessionStorage.removeItem('supabase.auth.codeVerifier');
 
           if (!response.ok) {
               // Try to parse error from worker response body
